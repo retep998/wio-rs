@@ -3,3 +3,7 @@
 name = "wio"
 version = "0.0.1"
 authors = ["Peter Atashian <retep998@gmail.com>"]
+
+[dependencies]
+winapi = "*"
+kernel32-sys = "*"
