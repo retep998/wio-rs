@@ -3,6 +3,9 @@
 name = "wio"
 version = "0.0.1"
 authors = ["Peter Atashian <retep998@gmail.com>"]
+description = "Windows Async IO for Rust."
+license = "MIT"
+repository = "https://github.com/retep998/wio-rs"
 
 [dependencies]
 winapi = "*"

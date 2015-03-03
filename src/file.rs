@@ -16,7 +16,6 @@ impl Drop for File {
 mod test {
     use {w};
     use file::{File};
-
     #[test] #[should_fail]
     fn test_file_drop() {
         drop(File { handle: w::INVALID_HANDLE_VALUE });
