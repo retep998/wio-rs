@@ -45,6 +45,14 @@ impl Display for Error {
         fmt.pad(&s.to_string_lossy())
     }
 }
+
+/// Sleep for the given time, waking if an I/O callback occurs.
+///
+/// Returns `false` if the timeout elapsed, or `true` if a callback occurred.
+pub fn sleep(millis: u32) -> bool {
+    unsafe { k32::SleepEx(millis, 1) != 0 }
+}
+
 #[cfg(test)]
 mod test {
     use Error;
