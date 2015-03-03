@@ -12,3 +12,13 @@ impl Drop for File {
         assert!(err != 0, "{}", Error::last());
     }
 }
+#[cfg(test)]
+mod test {
+    use {w};
+    use file::{File};
+
+    #[test] #[should_fail]
+    fn test_file_drop() {
+        drop(File { handle: w::INVALID_HANDLE_VALUE });
+    }
+}
