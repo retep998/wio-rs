@@ -1,7 +1,7 @@
 // Copyright © 2015, Peter Atashian
 // Licensed under the MIT License <LICENSE.md>
 
-#![feature(io, old_io, os, std_misc)]
+#![feature(io, old_io, os, path, std_misc)]
 
 extern crate "winapi" as w;
 extern crate "kernel32-sys" as k32;
