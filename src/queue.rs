@@ -61,6 +61,6 @@ mod test {
     fn test_queue() {
         let queue = Queue::new(0).unwrap();
         queue.send(Box::new(273)).unwrap();
-        println!("{}", queue.recv().unwrap());
+        assert!(*queue.recv().unwrap() == 273);
     }
 }

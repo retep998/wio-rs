@@ -6,6 +6,7 @@
 extern crate "winapi" as w;
 extern crate "kernel32-sys" as k32;
 
+pub mod apc;
 pub mod file;
 pub mod queue;
 
@@ -37,15 +38,15 @@ impl FromError<Error> for std::io::Error {
 impl Display for Error {
     fn fmt(&self, fmt: &mut Formatter) -> Result<(), fmt::Error> {
         let mut buf = [0; 0x1000];
-        let len = unsafe {
+        match unsafe {
             k32::FormatMessageW(
                 w::FORMAT_MESSAGE_FROM_SYSTEM, null(), self.code, 0,buf.as_mut_ptr(),
                 buf.len() as w::DWORD, null_mut(),
             )
-        };
-        if len == 0 { return Err(fmt::Error) }
-        let s = OsString::from_wide(&buf[..len as usize]);
-        fmt.pad(&s.to_string_lossy())
+        } {
+            0 => Err(fmt::Error),
+            len => fmt.pad(&OsString::from_wide(&buf[..len as usize]).to_string_lossy()),
+        }
     }
 }
 
