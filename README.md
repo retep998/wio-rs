@@ -1,3 +1,3 @@
 # wio-rs #
 
-Windows Async IO for Rust. Stuff will happen soon.
+Various Windows things for Rust. The focus is on async IO, but anything goes really.
