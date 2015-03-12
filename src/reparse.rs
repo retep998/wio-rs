@@ -40,7 +40,8 @@ pub fn reparse_read_handle(handle: w::HANDLE) -> Result<ReparsePoint, Error> {
     let mut bytes = 0;
     if unsafe {
         k32::DeviceIoControl(
-            handle, w::FSCTL_GET_REPARSE_POINT, null_mut(), 0, buf.as_mut_ptr() as w::LPVOID, buf.len() as w::DWORD, &mut bytes as w::LPDWORD, null_mut(),
+            handle, w::FSCTL_GET_REPARSE_POINT, null_mut(), 0, buf.as_mut_ptr() as w::LPVOID,
+            buf.len() as w::DWORD, &mut bytes as w::LPDWORD, null_mut(),
         )
     } == 0 { return Err(Error::last()) }
     let head = unsafe { &*(buf.as_ptr() as *const ReparseHead) };
