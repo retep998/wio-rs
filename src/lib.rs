@@ -1,7 +1,7 @@
 // Copyright © 2015, Peter Atashian
 // Licensed under the MIT License <LICENSE.md>
 
-#![feature(alloc, io, old_io, os, path, std_misc, unsafe_destructor)]
+#![feature(alloc, io, old_io, path, std_misc, unsafe_destructor)]
 
 extern crate "winapi" as w;
 extern crate "kernel32-sys" as k32;
@@ -9,12 +9,14 @@ extern crate "kernel32-sys" as k32;
 pub mod apc;
 pub mod file;
 pub mod queue;
+pub mod reparse;
 
-use std::error::FromError;
-use std::ffi::OsString;
+use std::error::{FromError};
+use std::ffi::{OsString};
 use std::fmt::{self, Display, Formatter};
+use std::ops::{Deref};
+use std::os::windows::{OsStringExt};
 use std::ptr::{null, null_mut};
-use std::os::windows::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Error {
@@ -55,6 +57,17 @@ impl Display for Error {
 /// Returns `false` if the timeout elapsed, or `true` if a callback occurred.
 pub fn sleep(millis: u32) -> bool {
     unsafe { k32::SleepEx(millis, 1) != 0 }
+}
+struct Handle(w::HANDLE);
+impl Drop for Handle {
+    fn drop(&mut self) {
+        let err = unsafe { k32::CloseHandle(self.0) };
+        assert!(err != 0, "{}", Error::last());
+    }
+}
+impl Deref for Handle {
+    type Target = w::HANDLE;
+    fn deref(&self) -> &w::HANDLE { &self.0 }
 }
 
 #[cfg(test)]

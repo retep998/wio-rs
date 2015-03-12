@@ -1,13 +1,13 @@
 // Copyright © 2015, Peter Atashian
 // Licensed under the MIT License <LICENSE.md>
 
-use {Error, w, k32};
+use {Error, Handle, w, k32};
 use std::boxed::{into_raw};
 use std::marker::{PhantomData};
 use std::ptr::{null_mut};
 
 pub struct Queue<T> where T: Send + 'static {
-    handle: w::HANDLE,
+    handle: Handle,
     phantom: PhantomData<T>,
 }
 impl<T> Queue<T> where T: Send + 'static {
@@ -17,12 +17,12 @@ impl<T> Queue<T> where T: Send + 'static {
             k32::CreateIoCompletionPort(w::INVALID_HANDLE_VALUE, null_mut(), 0, concurrency)
         };
         if handle == w::INVALID_HANDLE_VALUE { Err(Error::last()) }
-        else { Ok(Queue { handle: handle, phantom: PhantomData }) }
+        else { Ok(Queue { handle: Handle(handle), phantom: PhantomData }) }
     }
     pub fn send(&self, val: Box<T>) -> Result<(), Error> {
         match unsafe {
             k32::PostQueuedCompletionStatus(
-                self.handle, 0, 0, into_raw(val) as w::LPOVERLAPPED,
+                *self.handle, 0, 0, into_raw(val) as w::LPOVERLAPPED,
             )
         } {
             0 => Err(Error::last()),
@@ -35,20 +35,13 @@ impl<T> Queue<T> where T: Send + 'static {
         let mut over = null_mut();
         match unsafe {
             k32::GetQueuedCompletionStatus(
-                self.handle, &mut num as w::LPDWORD, &mut key as w::PULONG_PTR,
+                *self.handle, &mut num as w::LPDWORD, &mut key as w::PULONG_PTR,
                 &mut over as *mut w::LPOVERLAPPED, w::INFINITE,
             )
         } {
             0 => Err(Error::last()),
             _ => Ok(unsafe { Box::from_raw(over as *mut T) }),
         }
-    }
-}
-#[unsafe_destructor]
-impl<T> Drop for Queue<T> where T: Send + 'static {
-    fn drop(&mut self) {
-        let err = unsafe { k32::CloseHandle(self.handle) };
-        assert!(err != 0, "{}", Error::last());
     }
 }
 unsafe impl<T> Send for Queue<T> {}

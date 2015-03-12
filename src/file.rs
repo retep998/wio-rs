@@ -46,7 +46,7 @@ mod test {
     use {w};
     use super::*;
     use std::path::Path;
-    #[test] #[should_fail]
+    #[test] #[should_panic]
     fn test_file_drop() {
         drop(File { handle: w::INVALID_HANDLE_VALUE });
     }
@@ -56,7 +56,7 @@ mod test {
         File::new(&p, OpenMode::CreateAlways).unwrap();
         File::new(&p, OpenMode::CreateAlways).unwrap();
     }
-    #[test] #[should_fail]
+    #[test] #[should_panic]
     fn make_file_failure() {
         let p = Path::new("bar.txt");
         File::new(&p, OpenMode::CreateNew).unwrap();
