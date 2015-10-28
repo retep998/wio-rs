@@ -1,3 +1,4 @@
 # wio-rs #
 
-Various Windows things for Rust. The focus is on async IO, but anything goes really.
+A middle-level wrapper around various things in Windows API.
+Designed to be a very thin layer around Windows API to provide a safe Rusty API but without hiding any functionality.
