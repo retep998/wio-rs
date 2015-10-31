@@ -5,6 +5,7 @@ use {k32, w};
 pub fn sleep(ms: u32) {
     unsafe { k32::Sleep(ms) }
 }
+#[derive(Debug, Eq, PartialEq)]
 pub enum WakeReason {
     TimedOut,
     CallbacksFired,

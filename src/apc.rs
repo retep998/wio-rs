@@ -1,11 +1,10 @@
 // Copyright © 2015, Peter Atashian
 // Licensed under the MIT License <LICENSE.md>
-use {k32, w};
-use std::io::{Error};
+use {IoResult, k32, last_error, w};
 use std::os::windows::io::{AsRawHandle};
 use thread::{Thread};
 
-pub fn queue<T>(func: T, thread: &Thread) -> Result<(), Error> where T: FnOnce() + 'static {
+pub fn queue<T>(func: T, thread: &Thread) -> IoResult<()> where T: FnOnce() + 'static {
     unsafe extern "system" fn helper<T: FnOnce() + 'static>(thing: w::ULONG_PTR) {
         let func = Box::from_raw(thing as *mut T);
         func()
@@ -15,12 +14,12 @@ pub fn queue<T>(func: T, thread: &Thread) -> Result<(), Error> where T: FnOnce()
         0 => {
             // If it fails we still need to deallocate the function
             unsafe { Box::from_raw(thing as *mut T) };
-            Err(Error::last_os_error())
+            last_error()
         },
         _ => Ok(()),
     }
 }
-pub fn queue_current<T>(func: T) -> Result<(), Error> where T: FnOnce() + 'static {
+pub fn queue_current<T>(func: T) -> IoResult<()> where T: FnOnce() + 'static {
     unsafe extern "system" fn helper<T: FnOnce() + 'static>(thing: w::ULONG_PTR) {
         let func = Box::from_raw(thing as *mut T);
         func()
@@ -30,7 +29,7 @@ pub fn queue_current<T>(func: T) -> Result<(), Error> where T: FnOnce() + 'stati
         0 => {
             // If it fails we still need to deallocate the function
             unsafe { Box::from_raw(thing as *mut T) };
-            Err(Error::last_os_error())
+            last_error()
         },
         _ => Ok(()),
     }
