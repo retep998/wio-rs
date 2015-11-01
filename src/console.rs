@@ -2,30 +2,62 @@
 // Licensed under the MIT License <LICENSE.md>
 use {IoResult, k32, last_error, w};
 use handle::{Handle};
-use std::ptr::{null, null_mut};
+use std::mem::{zeroed};
 use std::os::windows::io::{FromRawHandle};
+use std::ptr::{null, null_mut};
+use wide::{ToWide};
 
-pub struct Console(Handle);
-
-impl Console {
-    pub fn new() -> IoResult<Console> {
+pub struct ScreenBuffer(Handle);
+impl ScreenBuffer {
+    pub fn new() -> IoResult<ScreenBuffer> {
         let handle = unsafe { k32::CreateConsoleScreenBuffer(
-            w::GENERIC_READ | w::GENERIC_WRITE,
-            w::FILE_SHARE_READ | w::FILE_SHARE_WRITE,
-            null(),
-            w::CONSOLE_TEXTMODE_BUFFER,
-            null_mut(),
+            w::GENERIC_READ | w::GENERIC_WRITE, w::FILE_SHARE_READ | w::FILE_SHARE_WRITE,
+            null(), w::CONSOLE_TEXTMODE_BUFFER, null_mut(),
         )};
         if handle == w::INVALID_HANDLE_VALUE { last_error() }
-        else { Ok(Console(unsafe { Handle::from_raw_handle(handle) })) }
+        else { unsafe { Ok(ScreenBuffer::from_raw_handle(handle)) } }
+    }
+    /// Gets the actual active console screen buffer
+    pub fn from_stdout() -> IoResult<ScreenBuffer> {
+        let handle = unsafe { k32::CreateFileW(
+            "CONOUT$".to_wide_null().as_ptr(), w::GENERIC_READ | w::GENERIC_WRITE,
+            w::FILE_SHARE_READ | w::FILE_SHARE_WRITE, null_mut(), w::OPEN_EXISTING,
+            0, null_mut(),
+        ) };
+        if handle == w::INVALID_HANDLE_VALUE { last_error() }
+        else { unsafe { Ok(ScreenBuffer::from_raw_handle(handle)) } }
+    }
+    /// Gets the actual active console input buffer
+    pub fn from_stdin() -> IoResult<ScreenBuffer> {
+        unimplemented!()
     }
     pub fn set_active(&self) -> IoResult<()> {
         let res = unsafe { k32::SetConsoleActiveScreenBuffer(*self.0) };
         if res == 0 { last_error() }
         else { Ok(()) }
     }
+    pub fn info(&self) -> IoResult<Info> {
+        let mut info = Info(unsafe { zeroed() });
+        let res = unsafe { k32::GetConsoleScreenBufferInfo(*self.0, &mut info.0) };
+        if res == 0 { last_error() }
+        else { Ok(info) }
+    }
+    pub fn set_info_ex(&self) -> IoResult<()> {
+        unimplemented!()
+    }
 }
-
+impl FromRawHandle for ScreenBuffer {
+    unsafe fn from_raw_handle(handle: w::HANDLE) -> ScreenBuffer {
+        ScreenBuffer(Handle::from_raw_handle(handle))
+    }
+}
+#[derive(Debug)]
+pub struct Info(w::CONSOLE_SCREEN_BUFFER_INFO);
+impl Info {
+    pub fn size(&self) -> (i16, i16) {
+        (self.0.dwSize.X, self.0.dwSize.Y)
+    }
+}
 /// Allocates a console if the process does not already have a console.
 pub fn alloc() -> IoResult<()> {
     match unsafe { k32::AllocConsole() } {
