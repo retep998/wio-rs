@@ -1,12 +1,11 @@
 [package]
-
 name = "wio"
-version = "0.0.1"
+version = "0.1.0"
 authors = ["Peter Atashian <retep998@gmail.com>"]
 description = "Windows IO wrapper"
 license = "MIT"
 repository = "https://github.com/retep998/wio-rs"
 
 [dependencies]
-winapi = "*"
-kernel32-sys = "*"
+winapi = "0.2.5"
+kernel32-sys = "0.2.1"
