@@ -1,4 +1,4 @@
-// Copyright © 2015, Peter Atashian
+// Copyright © 2016, Peter Atashian
 // Licensed under the MIT License <LICENSE.md>
 use {IoResult, k32, last_error, w};
 use handle::{Handle};
@@ -51,6 +51,12 @@ impl ScreenBuffer {
     pub fn set_info_ex(&self) -> IoResult<()> {
         unimplemented!()
     }
+    pub fn available_input(&self) -> IoResult<u32> {
+        let mut num = 0;
+        let res = unsafe { k32::GetNumberOfConsoleInputEvents(*self.0, &mut num) };
+        if res == 0 { return last_error() }
+        Ok(num)
+    }
     pub fn read_input(&self) -> IoResult<Vec<Input>> {
         let mut buf: [w::INPUT_RECORD; 0x1000] = unsafe { zeroed() };
         let mut size = 0;
@@ -72,6 +78,22 @@ impl ScreenBuffer {
             } }
         }).collect())
     }
+    pub fn write_output(&self, buf: &[CharInfo], size: (i16, i16), pos: (i16, i16)) -> IoResult<()> {
+        assert!(buf.len() == (size.0 * size.1) as usize);
+        let mut rect = w::SMALL_RECT {
+            Left: pos.0,
+            Top: pos.1,
+            Right: pos.0 + size.0,
+            Bottom: pos.1 + size.1,
+        };
+        let size = w::COORD { X: size.0, Y: size.1 };
+        let pos = w::COORD { X: 0, Y: 0 };
+        let res = unsafe { k32::WriteConsoleOutputW(
+            *self.0, buf.as_ptr() as *const w::CHAR_INFO, size, pos, &mut rect
+        )};
+        if res == 0 { return last_error() }
+        Ok(())
+    }
 }
 impl FromRawHandle for ScreenBuffer {
     unsafe fn from_raw_handle(handle: w::HANDLE) -> ScreenBuffer {
@@ -91,6 +113,16 @@ pub enum Input {
     WindowBufferSize(i16, i16),
     Menu(u32),
     Focus(bool),
+}
+#[repr(C)]
+pub struct CharInfo(w::CHAR_INFO);
+impl CharInfo {
+    pub fn new(ch: u16, attr: u16) -> CharInfo {
+        CharInfo(w::CHAR_INFO {
+            UnicodeChar: ch,
+            Attributes: attr,
+        })
+    }
 }
 /// Allocates a console if the process does not already have a console.
 pub fn alloc() -> IoResult<()> {
