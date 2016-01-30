@@ -8,7 +8,8 @@ version = "0.1.0"
 
 [dependencies]
 kernel32-sys = "0.2.1"
+user32-sys = "0.1.2"
 winapi = "0.2.5"
 
 [dev-dependencies]
-rand = "0.3.12"
+rand = "0.3.13"
