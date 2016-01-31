@@ -4,6 +4,7 @@ use {IoResult, k32, last_error, w};
 use std::io::{Error};
 use std::ops::{Deref};
 use std::os::windows::io::{AsRawHandle, FromRawHandle, IntoRawHandle};
+use std::ptr::{null_mut};
 
 pub struct Handle(w::HANDLE);
 impl Handle {
@@ -11,6 +12,17 @@ impl Handle {
         match unsafe { k32::CloseHandle(self.into_raw_handle()) } {
             0 => last_error(),
             _ => Ok(()),
+        }
+    }
+    pub unsafe fn duplicate_from(handle: w::HANDLE) -> IoResult<Handle> {
+        let mut new_handle = null_mut();
+        let res = k32::DuplicateHandle(
+            k32::GetCurrentProcess(), handle, k32::GetCurrentProcess(),
+            &mut new_handle, 0, w::FALSE, w::DUPLICATE_SAME_ACCESS,
+        );
+        match res {
+            0 => last_error(),
+            _ => Ok(Handle(new_handle)),
         }
     }
 }
