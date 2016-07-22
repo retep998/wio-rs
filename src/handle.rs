@@ -1,6 +1,6 @@
 // Copyright © 2015, Peter Atashian
 // Licensed under the MIT License <LICENSE.md>
-use {IoResult, k32, last_error, w};
+use {Result, k32, last_error, w};
 use std::io::{Error};
 use std::ops::{Deref};
 use std::os::windows::io::{AsRawHandle, FromRawHandle, IntoRawHandle};
@@ -8,13 +8,18 @@ use std::ptr::{null_mut};
 
 pub struct Handle(w::HANDLE);
 impl Handle {
-    pub fn close(self) -> IoResult<()> {
+    // Takes ownership of the handle
+    pub unsafe fn new(handle: w::HANDLE) -> Handle {
+        Handle(handle)
+    }
+    pub fn close(self) -> Result<()> {
         match unsafe { k32::CloseHandle(self.into_raw_handle()) } {
             0 => last_error(),
             _ => Ok(()),
         }
     }
-    pub unsafe fn duplicate_from(handle: w::HANDLE) -> IoResult<Handle> {
+    // Duplicates the handle without taking ownership
+    pub unsafe fn duplicate_from(handle: w::HANDLE) -> Result<Handle> {
         let mut new_handle = null_mut();
         let res = k32::DuplicateHandle(
             k32::GetCurrentProcess(), handle, k32::GetCurrentProcess(),

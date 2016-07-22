@@ -1,19 +1,19 @@
 // Copyright © 2015, Peter Atashian
 // Licensed under the MIT License <LICENSE.md>
-use {IoResult, k32, last_error, w};
+use {Result, k32, last_error, w};
 use handle::{Handle};
 use std::os::windows::io::{AsRawHandle, FromRawHandle, IntoRawHandle};
 use std::thread::{JoinHandle};
 
 pub struct Thread(Handle);
 impl Thread {
-    pub fn current() -> IoResult<Thread> {
+    pub fn current() -> Result<Thread> {
         unsafe { Handle::duplicate_from(k32::GetCurrentThread()).map(Thread) }
     }
     /// Returns the old affinity mask on success
-    pub fn set_affinity_mask(&self, mask: usize) -> IoResult<usize> {
+    pub fn set_affinity_mask(&self, mask: usize) -> Result<usize> {
         let res = unsafe {
-            k32::SetThreadAffinityMask(*self.0, mask as w::DWORD_PTR)
+            k32::SetThreadAffinityMask(*self.0, mask as w::DWORD)
         };
         match res {
             0 => last_error(),

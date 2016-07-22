@@ -1,10 +1,10 @@
 // Copyright © 2015, Peter Atashian
 // Licensed under the MIT License <LICENSE.md>
-use {IoResult, k32, last_error, w};
+use {Result, k32, last_error, w};
 use std::os::windows::io::{AsRawHandle};
 use thread::{Thread};
 
-pub fn queue<T>(func: T, thread: &Thread) -> IoResult<()> where T: FnOnce() + 'static {
+pub fn queue<T>(func: T, thread: &Thread) -> Result<()> where T: FnOnce() + 'static {
     unsafe extern "system" fn helper<T: FnOnce() + 'static>(thing: w::ULONG_PTR) {
         let func = Box::from_raw(thing as *mut T);
         func()
@@ -19,7 +19,7 @@ pub fn queue<T>(func: T, thread: &Thread) -> IoResult<()> where T: FnOnce() + 's
         _ => Ok(()),
     }
 }
-pub fn queue_current<T>(func: T) -> IoResult<()> where T: FnOnce() + 'static {
+pub fn queue_current<T>(func: T) -> Result<()> where T: FnOnce() + 'static {
     unsafe extern "system" fn helper<T: FnOnce() + 'static>(thing: w::ULONG_PTR) {
         let func = Box::from_raw(thing as *mut T);
         func()

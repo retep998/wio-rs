@@ -7,6 +7,7 @@ repository = "https://github.com/retep998/wio-rs"
 version = "0.1.1"
 
 [dependencies]
+advapi32-sys = "0.2.0"
 kernel32-sys = "0.2.1"
 user32-sys = "0.1.2"
 winapi = "0.2.5"

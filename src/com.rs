@@ -1,6 +1,7 @@
 // Copyright © 2016, Peter Atashian
 // Licensed under the MIT License <LICENSE.md>
 use {w};
+use std::mem::{forget};
 use std::ops::{Deref, DerefMut};
 
 pub struct ComPtr<T>(*mut T);
@@ -10,12 +11,17 @@ impl<T> ComPtr<T> {
     /// `T` __must__ be a COM interface that inherits from `IUnknown`.
     pub unsafe fn new(ptr: *mut T) -> ComPtr<T> { ComPtr(ptr) }
     /// Casts up the inheritance chain
-    pub fn up<U>(&self) -> ComPtr<U> where T: Deref<Target=U> {
-        unimplemented!()
+    pub fn up<U>(self) -> ComPtr<U> where T: Deref<Target=U> {
+        ComPtr(self.into_raw() as *mut U)
     }
     /// Make sure you know what you're doing with this function
     pub unsafe fn as_mut(&self) -> &mut T {
         &mut*self.0
+    }
+    fn into_raw(self) -> *mut T {
+        let p = self.0;
+        forget(self);
+        p
     }
     fn as_unknown(&self) -> &mut w::IUnknown {
         unsafe { &mut *(self.0 as *mut w::IUnknown) }

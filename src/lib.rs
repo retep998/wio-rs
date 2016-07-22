@@ -1,6 +1,7 @@
 // Copyright © 2016, Peter Atashian
 // Licensed under the MIT License <LICENSE.md>
 #![cfg(windows)]
+#![feature(const_fn)]
 extern crate winapi as w;
 extern crate kernel32 as k32;
 
@@ -14,10 +15,14 @@ pub mod sleep;
 pub mod thread;
 pub mod wide;
 
-use std::io::{Error};
+#[derive(Clone, Copy, Debug)]
+pub struct Error(w::DWORD);
+impl Error {
+    pub fn code(&self) -> u32 { self.0 }
+}
 
-pub type IoResult<T> = Result<T, Error>;
+pub type Result<T> = std::result::Result<T, Error>;
 
-fn last_error<T>() -> IoResult<T> {
-    Err(Error::last_os_error())
+fn last_error<T>() -> Result<T> {
+    Err(Error(unsafe { k32::GetLastError() }))
 }
