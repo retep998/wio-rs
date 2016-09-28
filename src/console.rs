@@ -74,6 +74,7 @@ impl ScreenBuffer {
         let res = unsafe { k32::SetConsoleCursorPosition(*self.0, pos) };
         if res == 0 { return last_error() }
         Ok(())
+    }
     pub fn font_size(&self) -> Result<(i16, i16)> {
         unsafe {
             let mut font = zeroed();
