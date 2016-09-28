@@ -13,7 +13,7 @@ impl Thread {
     /// Returns the old affinity mask on success
     pub fn set_affinity_mask(&self, mask: usize) -> Result<usize> {
         let res = unsafe {
-            k32::SetThreadAffinityMask(*self.0, mask as w::DWORD)
+            k32::SetThreadAffinityMask(*self.0, mask as w::DWORD_PTR)
         };
         match res {
             0 => last_error(),
