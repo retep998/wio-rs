@@ -40,7 +40,7 @@ impl<T> DerefMut for ComPtr<T> {
 }
 impl<T> Clone for ComPtr<T> {
     fn clone(&self) -> Self {
-        unsafe { 
+        unsafe {
             self.as_unknown().AddRef();
             ComPtr::new(self.0)
         }

@@ -1,7 +1,6 @@
 // Copyright © 2016, Peter Atashian
 // Licensed under the MIT License <LICENSE.md>
 #![cfg(windows)]
-#![feature(const_fn)]
 extern crate winapi as w;
 extern crate kernel32 as k32;
 
