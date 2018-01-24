@@ -32,13 +32,13 @@ impl ScreenBuffer {
         if res == 0 { return last_error() }
         Ok(())
     }
-    pub fn info(&self) -> Result<Info> {
-        let mut info = Info(unsafe { zeroed() });
+    pub fn info(&self) -> Result<ScreenBufferInfo> {
+        let mut info = ScreenBufferInfo(unsafe { zeroed() });
         let res = unsafe { k32::GetConsoleScreenBufferInfo(*self.0, &mut info.0) };
         if res == 0 { return last_error() }
         Ok(info)
     }
-    pub fn info_ex(&self) -> Result<InfoEx> {
+    pub fn info_ex(&self) -> Result<ScreenBufferInfoEx> {
         let mut info: w::CONSOLE_SCREEN_BUFFER_INFOEX = unsafe { zeroed() };
         info.cbSize = size_of_val(&info) as u32;
         let res = unsafe { k32::GetConsoleScreenBufferInfoEx(*self.0, &mut info) };
@@ -46,13 +46,22 @@ impl ScreenBuffer {
         // Yes, this is important
         info.srWindow.Right += 1;
         info.srWindow.Bottom += 1;
-        Ok(InfoEx(info))
+        Ok(ScreenBufferInfoEx(info))
     }
-    pub fn set_info_ex(&self, mut info: InfoEx) -> Result<()> {
+    pub fn set_info_ex(&self, mut info: ScreenBufferInfoEx) -> Result<()> {
         let res = unsafe { k32::SetConsoleScreenBufferInfoEx(*self.0, &mut info.0) };
         if res == 0 { return last_error() }
         Ok(())
     }
+    // pub fn font_ex(&self) -> Result<FontEx> {
+        // unsafe {
+            // let mut info = zeroed();
+            // info.cbSize = size_of_val(&info);
+            // let res = k32::GetCurrentConsoleFontEx(*self.0, w::FALSE, &mut info);
+            // if res == 0 { return last_error() }
+            // Ok(FontEx(info))
+        // }
+    // }
     pub fn write_output(&self, buf: &[CharInfo], size: (i16, i16), pos: (i16, i16)) -> Result<()> {
         assert!(buf.len() == (size.0 as usize) * (size.1 as usize));
         let mut rect = w::SMALL_RECT {
@@ -155,16 +164,22 @@ impl FromRawHandle for InputBuffer {
     }
 }
 #[derive(Copy, Clone)]
-pub struct Info(w::CONSOLE_SCREEN_BUFFER_INFO);
-impl Info {
+pub struct ScreenBufferInfo(w::CONSOLE_SCREEN_BUFFER_INFO);
+impl ScreenBufferInfo {
     pub fn size(&self) -> (i16, i16) {
         (self.0.dwSize.X, self.0.dwSize.Y)
     }
 }
-#[derive(Copy, Clone, Debug)]
-pub struct InfoEx(pub w::CONSOLE_SCREEN_BUFFER_INFOEX);
-
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone)]
+pub struct ScreenBufferInfoEx(w::CONSOLE_SCREEN_BUFFER_INFOEX);
+impl ScreenBufferInfoEx {
+    pub fn raw_mut(&mut self) -> &mut w::CONSOLE_SCREEN_BUFFER_INFOEX {
+        &mut self.0
+    }
+}
+#[derive(Copy, Clone)]
+pub struct FontInfoEx(w::CONSOLE_FONT_INFOEX);
+#[derive(Copy, Clone)]
 pub enum Input {
     Key {
         key_down: bool,

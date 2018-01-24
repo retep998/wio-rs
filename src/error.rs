@@ -4,18 +4,17 @@
 // <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your option.
 // All files in the project carrying such notice may not be copied, modified, or distributed
 // except according to those terms.
-#![cfg(windows)]
-extern crate winapi;
+use std::result;
+use winapi::shared::minwindef::DWORD;
+use winapi::um::errhandlingapi::GetLastError;
+#[derive(Clone, Copy, Debug)]
+pub struct Error(DWORD);
+impl Error {
+    pub fn code(&self) -> u32 { self.0 }
+}
 
-// pub mod apc;
-pub mod com;
-// pub mod console;
-pub mod error;
-// pub mod handle;
-// pub mod perf;
-// pub mod pipe;
-// pub mod sleep;
-// pub mod thread;
-pub mod wide;
+pub type Result<T> = result::Result<T, Error>;
 
-pub use error::{Error, Result};
+pub fn last_error<T>() -> Result<T> {
+    Err(Error(unsafe { GetLastError() }))
+}
