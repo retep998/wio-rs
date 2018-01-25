@@ -42,6 +42,11 @@ impl<T> ComPtr<T> where T: Interface {
         if err < 0 { return Err(err); }
         Ok(unsafe { ComPtr::from_raw(obj as *mut U) })
     }
+    /// Obtains the raw pointer without transferring ownership.
+    /// Do __not__ release this pointer because it is still owned by the `ComPtr`.
+    pub fn as_raw(&self) -> *mut T {
+        self.0
+    }
 }
 impl<T> Deref for ComPtr<T> where T: Interface {
     type Target = T;
