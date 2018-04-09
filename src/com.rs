@@ -12,10 +12,11 @@ use std::ptr::NonNull;
 use winapi::Interface;
 use winapi::um::unknwnbase::IUnknown;
 
-/// ComPtr to wrap COM interfaces sanely
 #[cfg(not(feature = "com_nonnull"))]
+/// ComPtr to wrap COM interfaces sanely
 pub struct ComPtr<T>(*mut T) where T: Interface;
 #[cfg(feature = "com_nonnull")]
+/// ComPtr to wrap COM interfaces sanely
 pub struct ComPtr<T>(NonNull<T>) where T: Interface;
 impl<T> ComPtr<T> where T: Interface {
     /// Creates a `ComPtr` to wrap a raw pointer.
