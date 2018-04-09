@@ -12,7 +12,6 @@ use std::ptr::NonNull;
 use winapi::Interface;
 use winapi::um::unknwnbase::IUnknown;
 
-
 /// ComPtr to wrap COM interfaces sanely
 pub struct ComPtr<T>(
     #[cfg(not(feature = "com_nonnull"))] *mut T,
