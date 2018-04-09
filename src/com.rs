@@ -12,28 +12,24 @@ use std::ptr::NonNull;
 use winapi::Interface;
 use winapi::um::unknwnbase::IUnknown;
 
-#[cfg(not(feature = "com_nonnull"))]
+
 /// ComPtr to wrap COM interfaces sanely
-pub struct ComPtr<T>(*mut T) where T: Interface;
-#[cfg(feature = "com_nonnull")]
-/// ComPtr to wrap COM interfaces sanely
-pub struct ComPtr<T>(NonNull<T>) where T: Interface;
+pub struct ComPtr<T>(
+    #[cfg(not(feature = "com_nonnull"))] *mut T,
+    #[cfg(feature = "com_nonnull")] NonNull<T>,
+) where T: Interface;
 impl<T> ComPtr<T> where T: Interface {
     /// Creates a `ComPtr` to wrap a raw pointer.
     /// It takes ownership over the pointer which means it does __not__ call `AddRef`.
     /// `T` __must__ be a COM interface that inherits from `IUnknown`.
-    #[cfg(not(feature = "com_nonnull"))]
     pub unsafe fn from_raw(ptr: *mut T) -> ComPtr<T> {
         assert!(!ptr.is_null());
-        ComPtr(ptr)
-    }
-    /// Creates a `ComPtr` to wrap a raw pointer.
-    /// It takes ownership over the pointer which means it does __not__ call `AddRef`.
-    /// `T` __must__ be a COM interface that inherits from `IUnknown`.
-    #[cfg(feature = "com_nonnull")]
-    pub unsafe fn from_raw(ptr: *mut T) -> ComPtr<T> {
-        assert!(!ptr.is_null());
-        ComPtr(NonNull::new_unchecked(ptr))
+        #[cfg(not(feature = "com_nonnull"))] {
+            ComPtr(ptr)
+        }
+        #[cfg(feature = "com_nonnull")] {
+            ComPtr(NonNull::new_unchecked(ptr))
+        }
     }
     /// Casts up the inheritance chain
     pub fn up<U>(self) -> ComPtr<U> where T: Deref<Target=U>, U: Interface {
@@ -59,15 +55,13 @@ impl<T> ComPtr<T> where T: Interface {
     }
     /// Obtains the raw pointer without transferring ownership.
     /// Do __not__ release this pointer because it is still owned by the `ComPtr`.
-    #[cfg(not(feature = "com_nonnull"))]
     pub fn as_raw(&self) -> *mut T {
-        self.0
-    }
-    /// Obtains the raw pointer without transferring ownership.
-    /// Do __not__ release this pointer because it is still owned by the `ComPtr`.
-    #[cfg(feature = "com_nonnull")]
-    pub fn as_raw(&self) -> *mut T {
-        self.0.as_ptr()
+        #[cfg(not(feature = "com_nonnull"))] {
+            self.0
+        }
+        #[cfg(feature = "com_nonnull")] {
+            self.0.as_ptr()
+        }
     }
 }
 impl<T> Deref for ComPtr<T> where T: Interface {
