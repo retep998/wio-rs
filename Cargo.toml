@@ -10,6 +10,9 @@ keywords = ["windows", "ffi", "win32", "com"]
 categories = ["api-bindings", "os::windows-apis"]
 include = ["/src/**/*", "/Cargo.toml", "/LICENSE-MIT", "/LICENSE-APACHE", "/build.rs", "/README.md"]
 
+[features]
+com_nonnull = []
+
 [dependencies]
 winapi = { version = "0.3", features = ["errhandlingapi", "minwindef", "unknwnbase"] }
 
