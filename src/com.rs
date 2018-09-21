@@ -11,6 +11,7 @@ use winapi::Interface;
 use winapi::um::unknwnbase::IUnknown;
 
 // ComPtr to wrap COM interfaces sanely
+#[repr(C)]
 pub struct ComPtr<T>(*mut T) where T: Interface;
 impl<T> ComPtr<T> where T: Interface {
     /// Creates a `ComPtr` to wrap a raw pointer.
