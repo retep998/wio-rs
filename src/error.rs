@@ -13,7 +13,6 @@ use std::result;
 use std::slice;
 use std::os::windows::ffi::OsStringExt;
 use winapi::shared::minwindef::DWORD;
-use winapi::shared::winerror::SUCCEEDED;
 use winapi::um::errhandlingapi::GetLastError;
 use winapi::um::winbase::{self, FormatMessageW};
 use winapi::um::winnt::{self, MAKELANGID, WCHAR};
