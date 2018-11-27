@@ -11,9 +11,25 @@ categories = ["api-bindings", "os::windows-apis"]
 include = ["/src/**/*", "/Cargo.toml", "/LICENSE-MIT", "/LICENSE-APACHE", "/build.rs", "/README.md"]
 
 [dependencies]
-winapi = { version = "0.3", features = [
-    "consoleapi", "errhandlingapi", "fileapi", "handleapi", "minwindef", "processthreadsapi", "std", "unknwnbase", "wincon", "winnt",
-] }
+libc = "0.2"
+
+[dependencies.winapi]
+version = "0.3"
+features = [
+    "consoleapi",
+    "errhandlingapi",
+    "fileapi",
+    "handleapi",
+    "minwindef",
+    "processthreadsapi",
+    "std",
+    "unknwnbase",
+    "winbase",
+    "wincon",
+    "winerror",
+    "winuser",
+    "winnt",
+]
 
 [dev-dependencies]
 rand = "0.4"
