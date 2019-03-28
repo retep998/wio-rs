@@ -3,6 +3,7 @@
 // <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your option.
 // All files in the project carrying such notice may not be copied, modified, or distributed
 // except according to those terms.
+use std::fmt::{Debug, Error as FmtError, Formatter};
 use std::mem::forget;
 use std::ops::Deref;
 use std::ptr::{NonNull, null_mut};
@@ -10,14 +11,13 @@ use winapi::Interface;
 use winapi::um::unknwnbase::IUnknown;
 
 // ComPtr to wrap COM interfaces sanely
-#[derive(Debug)]
 #[repr(transparent)]
-pub struct ComPtr<T>(NonNull<T>) where T: Interface;
-impl<T> ComPtr<T> where T: Interface {
+pub struct ComPtr<T>(NonNull<T>);
+impl<T> ComPtr<T> {
     /// Creates a `ComPtr` to wrap a raw pointer.
     /// It takes ownership over the pointer which means it does __not__ call `AddRef`.
     /// `T` __must__ be a COM interface that inherits from `IUnknown`.
-    pub unsafe fn from_raw(ptr: *mut T) -> ComPtr<T> {
+    pub unsafe fn from_raw(ptr: *mut T) -> ComPtr<T> where T: Interface {
         ComPtr(NonNull::new(ptr).expect("ptr should not be null"))
     }
     /// Casts up the inheritance chain
@@ -48,7 +48,7 @@ impl<T> ComPtr<T> where T: Interface {
         self.0.as_ptr()
     }
 }
-impl<T> Deref for ComPtr<T> where T: Interface {
+impl<T> Deref for ComPtr<T> {
     type Target = T;
     fn deref(&self) -> &T {
         unsafe { &*self.as_raw() }
@@ -62,7 +62,12 @@ impl<T> Clone for ComPtr<T> where T: Interface {
         }
     }
 }
-impl<T> Drop for ComPtr<T> where T: Interface {
+impl<T> Debug for ComPtr<T> {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), FmtError> {
+        write!(f, "{:?}", self.0)
+    }
+}
+impl<T> Drop for ComPtr<T> {
     fn drop(&mut self) {
         unsafe { self.as_unknown().Release(); }
     }
