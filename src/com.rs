@@ -10,6 +10,7 @@ use winapi::Interface;
 use winapi::um::unknwnbase::IUnknown;
 
 // ComPtr to wrap COM interfaces sanely
+#[derive(Debug)]
 #[repr(transparent)]
 pub struct ComPtr<T>(NonNull<T>) where T: Interface;
 impl<T> ComPtr<T> where T: Interface {
