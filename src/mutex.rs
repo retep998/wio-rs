@@ -4,7 +4,10 @@
 // All files in the project carrying such notice may not be copied, modified, or distributed
 // except according to those terms.
 
-use std::ptr::null_mut;
+use std::{
+    marker::PhantomData,
+    ptr::null_mut,
+};
 use winapi::{
     shared::{
         minwindef::FALSE,
@@ -21,9 +24,10 @@ use winapi::{
     },
 };
 use error::Error;
+use handle::Handle;
 use wide::ToWide;
 
-pub struct Mutex(HANDLE);
+pub struct Mutex(Handle);
 impl Mutex {
     pub fn create(security_attributes: Option<&SECURITY_ATTRIBUTES>, name: &str) -> Result<Mutex, Error> {
         unsafe {
@@ -33,9 +37,9 @@ impl Mutex {
                 name.to_wide_null().as_ptr(),
             );
             if handle.is_null() {
-                return Error::last();
+                return Err(Error::last());
             }
-            Ok(Mutex(handle))
+            Ok(Mutex(Handle::new(handle)))
         }
     }
     pub fn open(name: &str) -> Result<Mutex, Error> {
@@ -46,63 +50,56 @@ impl Mutex {
                 name.to_wide_null().as_ptr(),
             );
             if handle.is_null() {
-                return Error::last();
+                return Err(Error::last());
             }
-            Ok(Mutex(handle))
+            Ok(Mutex(Handle::new(handle)))
         }
     }
-    pub fn wait<'a>(&'a self) -> Result<Result<MutexGuard<'a>, MutexGuard<'a>>, Error> {
+    /// The timeout is specified in milliseconds
+    /// Specifying None for the timeout means to wait forever
+    pub fn wait<'a>(&'a self, timeout: Option<u32>) -> Result<MutexGuard<'a>, WaitError<'a>> {
         unsafe {
-            match WaitForSingleObject(self.0, INFINITE) {
-                WAIT_ABANDONED => Ok(Err(MutexGuard(self, self.0))),
-                WAIT_OBJECT_0 => Ok(Ok(MutexGuard(self, self.0))),
-                _ => Error::last(),
-            }
-        }
-    }
-    pub fn wait_timeout<'a>(&'a self, timeout: u32) -> Result<Option<Result<MutexGuard<'a>, MutexGuard<'a>>>, Error> {
-        unsafe {
-            match WaitForSingleObject(self.0, timeout) {
-                WAIT_ABANDONED => Ok(Some(Err(MutexGuard(self, self.0)))),
-                WAIT_OBJECT_0 => Ok(Some(Ok(MutexGuard(self, self.0)))),
-                WAIT_TIMEOUT => Ok(None),
-                _ => Error::last(),
+            match WaitForSingleObject(*self.0, timeout.unwrap_or(INFINITE)) {
+                WAIT_ABANDONED => Err(WaitError::Abandoned(MutexGuard::new(self))),
+                WAIT_OBJECT_0 => Ok(MutexGuard::new(self)),
+                WAIT_TIMEOUT => Err(WaitError::Timeout),
+                _ => Err(WaitError::Other(Error::last())),
             }
         }
     }
     pub fn try_clone(&self) -> Result<Mutex, Error> {
         unsafe {
-        let mut handle = null_mut();
-        if DuplicateHandle(
-            GetCurrentProcess(), self.0, GetCurrentProcess(),
-            &mut handle, 0, FALSE, DUPLICATE_SAME_ACCESS,
-        ) == 0 {
-            return Error::last();
-        }
-        Ok(Mutex(handle))
-        }
-    }
-}
-impl Drop for Mutex {
-    fn drop(&mut self) {
-        unsafe {
-            if CloseHandle(self.0) == 0 {
-                let err = GetLastError();
-                panic!("failed to call CloseHandle: {}", err);
+            let mut handle = null_mut();
+            if DuplicateHandle(
+                GetCurrentProcess(), *self.0, GetCurrentProcess(),
+                &mut handle, 0, FALSE, DUPLICATE_SAME_ACCESS,
+            ) == 0 {
+                return Err(Error::last());
             }
+            Ok(Mutex(Handle::new(handle)))
         }
     }
 }
 unsafe impl Send for Mutex {}
 unsafe impl Sync for Mutex {}
-pub struct MutexGuard<'a>(&'a Mutex, HANDLE);
+pub struct MutexGuard<'a>(HANDLE, PhantomData<&'a Mutex>);
+impl<'a> MutexGuard<'a> {
+    unsafe fn new(mutex: &'a Mutex) -> MutexGuard<'a> {
+        MutexGuard(*mutex.0, PhantomData)
+    }
+}
 impl<'a> Drop for MutexGuard<'a> {
     fn drop(&mut self) {
         unsafe {
-            if ReleaseMutex(self.1) == 0 {
+            if ReleaseMutex(self.0) == 0 {
                 let err = GetLastError();
                 panic!("failed to call ReleaseMutex: {}", err);
             }
         }
     }
+}
+pub enum WaitError<'a> {
+    Timeout,
+    Abandoned(MutexGuard<'a>),
+    Other(Error),
 }

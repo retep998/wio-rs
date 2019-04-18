@@ -26,7 +26,7 @@ impl Handle {
     }
     pub fn close(self) -> Result<()> {
         match unsafe { CloseHandle(self.into_raw_handle()) } {
-            0 => Error::last(),
+            0 => Err(Error::last()),
             _ => Ok(()),
         }
     }
@@ -38,7 +38,7 @@ impl Handle {
             &mut new_handle, 0, FALSE, DUPLICATE_SAME_ACCESS,
         );
         match res {
-            0 => Error::last(),
+            0 => Err(Error::last()),
             _ => Ok(Handle(new_handle)),
         }
     }
@@ -55,7 +55,7 @@ impl Deref for Handle {
 impl Drop for Handle {
     fn drop(&mut self) {
         let ret = unsafe { CloseHandle(self.0) };
-        let err: Result<()> = Error::last();
+        let err = Error::last();
         assert!(ret != 0, "{:?}", err);
     }
 }

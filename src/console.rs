@@ -29,7 +29,7 @@ impl ScreenBuffer {
             GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
             null(), CONSOLE_TEXTMODE_BUFFER, null_mut(),
         )};
-        if handle == INVALID_HANDLE_VALUE { return Error::last() }
+        if handle == INVALID_HANDLE_VALUE { return Err(Error::last()) }
         unsafe { Ok(ScreenBuffer(Handle::new(handle))) }
     }
     /// Gets the actual active console screen buffer
@@ -39,25 +39,25 @@ impl ScreenBuffer {
             FILE_SHARE_READ, null_mut(), OPEN_EXISTING,
             0, null_mut(),
         )};
-        if handle == INVALID_HANDLE_VALUE { return Error::last() }
+        if handle == INVALID_HANDLE_VALUE { return Err(Error::last()) }
         unsafe { Ok(ScreenBuffer(Handle::new(handle))) }
     }
     pub fn set_active(&self) -> Result<()> {
         let res = unsafe { SetConsoleActiveScreenBuffer(*self.0) };
-        if res == 0 { return Error::last() }
+        if res == 0 { return Err(Error::last()) }
         Ok(())
     }
     pub fn info(&self) -> Result<ScreenBufferInfo> {
         let mut info = ScreenBufferInfo(unsafe { zeroed() });
         let res = unsafe { GetConsoleScreenBufferInfo(*self.0, &mut info.0) };
-        if res == 0 { return Error::last() }
+        if res == 0 { return Err(Error::last()) }
         Ok(info)
     }
     pub fn info_ex(&self) -> Result<ScreenBufferInfoEx> {
         let mut info: CONSOLE_SCREEN_BUFFER_INFOEX = unsafe { zeroed() };
         info.cbSize = size_of_val(&info) as u32;
         let res = unsafe { GetConsoleScreenBufferInfoEx(*self.0, &mut info) };
-        if res == 0 { return Error::last() }
+        if res == 0 { return Err(Error::last()) }
         // Yes, this is important
         info.srWindow.Right += 1;
         info.srWindow.Bottom += 1;
@@ -65,7 +65,7 @@ impl ScreenBuffer {
     }
     pub fn set_info_ex(&self, mut info: ScreenBufferInfoEx) -> Result<()> {
         let res = unsafe { SetConsoleScreenBufferInfoEx(*self.0, &mut info.0) };
-        if res == 0 { return Error::last() }
+        if res == 0 { return Err(Error::last()) }
         Ok(())
     }
     // pub fn font_ex(&self) -> Result<FontEx> {
@@ -90,14 +90,14 @@ impl ScreenBuffer {
         let res = unsafe { WriteConsoleOutputW(
             *self.0, buf.as_ptr() as *const CHAR_INFO, size, pos, &mut rect
         )};
-        if res == 0 { return Error::last() }
+        if res == 0 { return Err(Error::last()) }
         Ok(())
     }
     pub fn font_size(&self) -> Result<(i16, i16)> {
         unsafe {
             let mut font = zeroed();
             let res = GetCurrentConsoleFont(*self.0, FALSE, &mut font);
-            if res == 0 { return Error::last() }
+        if res == 0 { return Err(Error::last()) }
             Ok((font.dwFontSize.X, font.dwFontSize.Y))
         }
     }
@@ -116,14 +116,14 @@ impl InputBuffer {
             FILE_SHARE_READ | FILE_SHARE_WRITE, null_mut(), OPEN_EXISTING,
             0, null_mut(),
         )};
-        if handle == INVALID_HANDLE_VALUE { Error::last() }
+        if handle == INVALID_HANDLE_VALUE { return Err(Error::last()) }
         else { unsafe { Ok(InputBuffer::from_raw_handle(handle)) } }
     }
     /// The number of input that is available to read
     pub fn available_input(&self) -> Result<u32> {
         let mut num = 0;
         let res = unsafe { GetNumberOfConsoleInputEvents(*self.0, &mut num) };
-        if res == 0 { return Error::last() }
+        if res == 0 { return Err(Error::last()) }
         Ok(num)
     }
     /// Reads a bunch of input events
@@ -133,7 +133,7 @@ impl InputBuffer {
         let res = unsafe { ReadConsoleInputW(
             *self.0, buf.as_mut_ptr(), buf.len() as DWORD, &mut size,
         )};
-        if res == 0 { return Error::last() }
+        if res == 0 { return Err(Error::last()) }
         Ok(buf[..(size as usize)].iter().map(|input| {
             unsafe { match input.EventType {
                 KEY_EVENT => {
@@ -169,7 +169,7 @@ impl InputBuffer {
     /// Clears all pending input
     pub fn flush_input(&self) -> Result<()> {
         let res = unsafe { FlushConsoleInputBuffer(*self.0) };
-        if res == 0 { return Error::last() }
+        if res == 0 { return Err(Error::last()) }
         Ok(())
     }
 }
@@ -229,14 +229,14 @@ impl CharInfo {
 /// Allocates a console if the process does not already have a console.
 pub fn alloc() -> Result<()> {
     match unsafe { AllocConsole() } {
-        0 => Error::last(),
+        0 => Err(Error::last()),
         _ => Ok(()),
     }
 }
 /// Detaches the process from its current console.
 pub fn free() -> Result<()> {
     match unsafe { FreeConsole() } {
-        0 => Error::last(),
+        0 => Err(Error::last()),
         _ => Ok(()),
     }
 }
@@ -244,7 +244,7 @@ pub fn free() -> Result<()> {
 /// Pass None to attach to the console of the parent process.
 pub fn attach(processid: Option<u32>) -> Result<()> {
     match unsafe { AttachConsole(processid.unwrap_or(-1i32 as u32)) } {
-        0 => Error::last(),
+        0 => Err(Error::last()),
         _ => Ok(()),
     }
 }
@@ -259,12 +259,12 @@ pub fn output_code_page() -> u32 {
 /// Sets the current input code page
 pub fn set_input_code_page(code: u32) -> Result<()> {
     let res = unsafe { SetConsoleCP(code) };
-    if res == 0 { return Error::last() }
+    if res == 0 { return Err(Error::last()) }
     Ok(())
 }
 /// Sets the current output code page
 pub fn set_output_code_page(code: u32) -> Result<()> {
     let res = unsafe { SetConsoleOutputCP(code) };
-    if res == 0 { return Error::last() }
+    if res == 0 { return Err(Error::last()) }
     Ok(())
 }

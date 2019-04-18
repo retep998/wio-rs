@@ -10,8 +10,11 @@ use winapi::um::errhandlingapi::GetLastError;
 pub struct Error(DWORD);
 impl Error {
     pub fn code(&self) -> u32 { self.0 }
-    pub fn last<T>() -> Result<T> {
-        Err(Error(unsafe { GetLastError() }))
+    pub(crate) fn last() -> Error {
+        Error(unsafe { GetLastError() })
+    }
+    pub(crate) fn last_result<T>() -> Result<T> {
+        Err(Error::last())
     }
 }
 
