@@ -26,7 +26,7 @@ impl Handle {
     }
     pub fn close(self) -> Result<()> {
         match unsafe { CloseHandle(self.into_raw_handle()) } {
-            0 => Err(Error::last()),
+            0 => Error::last_result(),
             _ => Ok(()),
         }
     }
@@ -38,7 +38,7 @@ impl Handle {
             &mut new_handle, 0, FALSE, DUPLICATE_SAME_ACCESS,
         );
         match res {
-            0 => Err(Error::last()),
+            0 => Error::last_result(),
             _ => Ok(Handle(new_handle)),
         }
     }

@@ -15,7 +15,6 @@ use winapi::{
     },
     um::{
         errhandlingapi::GetLastError,
-        handleapi::{CloseHandle, DuplicateHandle},
         minwinbase::SECURITY_ATTRIBUTES,
         processthreadsapi::GetCurrentProcess,
         synchapi::{CreateMutexW, OpenMutexW, ReleaseMutex, WaitForSingleObject},
@@ -37,7 +36,7 @@ impl Mutex {
                 name.to_wide_null().as_ptr(),
             );
             if handle.is_null() {
-                return Err(Error::last());
+                return Error::last_result();
             }
             Ok(Mutex(Handle::new(handle)))
         }
@@ -50,7 +49,7 @@ impl Mutex {
                 name.to_wide_null().as_ptr(),
             );
             if handle.is_null() {
-                return Err(Error::last());
+                return Error::last_result();
             }
             Ok(Mutex(Handle::new(handle)))
         }
@@ -69,14 +68,8 @@ impl Mutex {
     }
     pub fn try_clone(&self) -> Result<Mutex, Error> {
         unsafe {
-            let mut handle = null_mut();
-            if DuplicateHandle(
-                GetCurrentProcess(), *self.0, GetCurrentProcess(),
-                &mut handle, 0, FALSE, DUPLICATE_SAME_ACCESS,
-            ) == 0 {
-                return Err(Error::last());
-            }
-            Ok(Mutex(Handle::new(handle)))
+            let handle = Handle::duplicate_from(*self.0)?;
+            Ok(Mutex(handle))
         }
     }
 }
