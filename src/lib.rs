@@ -11,6 +11,7 @@ pub mod com;
 pub mod console;
 pub mod error;
 pub mod handle;
+pub mod mutex;
 // pub mod perf;
 // pub mod pipe;
 // pub mod sleep;
