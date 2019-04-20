@@ -15,7 +15,6 @@ use winapi::{
     },
     um::{
         errhandlingapi::GetLastError,
-        minwinbase::SECURITY_ATTRIBUTES,
         processthreadsapi::GetCurrentProcess,
         synchapi::{CreateMutexW, OpenMutexW, ReleaseMutex, WaitForSingleObject},
         winbase::{INFINITE, WAIT_ABANDONED, WAIT_OBJECT_0},
@@ -24,14 +23,16 @@ use winapi::{
 };
 use error::Error;
 use handle::Handle;
+use security_attributes::SecurityAttributes;
 use wide::ToWide;
 
 pub struct Mutex(Handle);
 impl Mutex {
-    pub fn create(security_attributes: Option<&SECURITY_ATTRIBUTES>, name: &str) -> Result<Mutex, Error> {
+    pub fn create(security_attributes: Option<&SecurityAttributes>, name: &str) -> Result<Mutex, Error> {
+        let security_attributes = security_attributes.map(|sa| sa.get_raw());
         unsafe {
             let handle = CreateMutexW(
-                security_attributes.map(|x| x as *const _ as *mut _).unwrap_or(null_mut()),
+                security_attributes.as_ref().map(|x| x as *const _ as *mut _).unwrap_or(null_mut()),
                 0,
                 name.to_wide_null().as_ptr(),
             );
