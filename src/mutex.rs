@@ -26,6 +26,7 @@ use winapi::{
 };
 use error::Error;
 use handle::Handle;
+use security_attributes::SecurityAttributes;
 use wide::ToWide;
 
 pub struct SecurityAttributes(SECURITY_ATTRIBUTES);

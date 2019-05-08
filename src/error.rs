@@ -7,7 +7,7 @@ use std::result;
 use winapi::shared::minwindef::DWORD;
 use winapi::um::errhandlingapi::GetLastError;
 #[derive(Clone, Copy, Debug)]
-pub struct Error(DWORD);
+pub struct Error(pub(crate) DWORD);
 impl Error {
     pub fn code(&self) -> u32 { self.0 }
     pub(crate) fn last() -> Error {

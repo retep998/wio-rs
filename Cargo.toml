@@ -12,7 +12,7 @@ include = ["/src/**/*", "/Cargo.toml", "/LICENSE-MIT", "/LICENSE-APACHE", "/buil
 
 [dependencies]
 winapi = { version = "0.3", features = [
-    "consoleapi", "errhandlingapi", "fileapi", "handleapi", "minwinbase", "minwindef", "processthreadsapi", "std", "synchapi", "unknwnbase", "winbase", "wincon", "winerror", "winnt",
+    "accctrl", "aclapi", "consoleapi", "errhandlingapi", "fileapi", "handleapi", "minwinbase", "minwindef", "processthreadsapi", "securitybaseapi", "std", "synchapi", "unknwnbase", "winbase", "wincon", "winerror", "winnt",
 ] }
 
 [dev-dependencies]

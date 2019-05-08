@@ -14,6 +14,7 @@ pub(crate) mod handle;
 pub mod mutex;
 // pub mod perf;
 // pub mod pipe;
+pub mod security_attributes;
 // pub mod sleep;
 // pub mod thread;
 pub mod wide;
