@@ -69,7 +69,11 @@ impl<T> Debug for ComPtr<T> {
 }
 impl<T> Drop for ComPtr<T> {
     fn drop(&mut self) {
-        unsafe { self.as_unknown().Release(); }
+        unsafe {
+            let ptr = self.as_raw() as *mut IUnknown;
+            let release_fn = (*(*ptr).lpVtbl).Release;
+            release_fn(ptr);
+        }
     }
 }
 impl<T> PartialEq<ComPtr<T>> for ComPtr<T> where T: Interface {
