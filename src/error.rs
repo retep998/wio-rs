@@ -9,7 +9,9 @@ use winapi::um::errhandlingapi::GetLastError;
 #[derive(Clone, Copy, Debug)]
 pub struct Error(DWORD);
 impl Error {
-    pub fn code(&self) -> u32 { self.0 }
+    pub fn code(&self) -> u32 {
+        self.0
+    }
     pub(crate) fn last() -> Error {
         Error(unsafe { GetLastError() })
     }

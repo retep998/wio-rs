@@ -4,6 +4,8 @@
 // All files in the project carrying such notice may not be copied, modified, or distributed
 // except according to those terms.
 
+use error::Error;
+use handle::Handle;
 use std::{
     fmt::{Debug, Error as FmtError, Formatter},
     marker::PhantomData,
@@ -11,11 +13,9 @@ use std::{
     ops::Deref,
     ptr::null_mut,
 };
+use wide::ToWide;
 use winapi::{
-    shared::{
-        minwindef::FALSE,
-        winerror::WAIT_TIMEOUT,
-    },
+    shared::{minwindef::FALSE, winerror::WAIT_TIMEOUT},
     um::{
         errhandlingapi::GetLastError,
         minwinbase::SECURITY_ATTRIBUTES,
@@ -24,9 +24,6 @@ use winapi::{
         winnt::{HANDLE, SECURITY_DESCRIPTOR, SYNCHRONIZE},
     },
 };
-use error::Error;
-use handle::Handle;
-use wide::ToWide;
 
 pub struct SecurityAttributes(SECURITY_ATTRIBUTES);
 impl SecurityAttributes {
@@ -41,28 +38,37 @@ impl SecurityAttributes {
 
 pub struct Mutex<T>(Handle, T);
 impl<T> Mutex<T> {
-    pub fn create(data: T, mut security_attributes: Option<SecurityAttributes>, name: &str) -> Result<Mutex<T>, InitError<T>> {
+    pub fn create(
+        data: T,
+        mut security_attributes: Option<SecurityAttributes>,
+        name: &str,
+    ) -> Result<Mutex<T>, InitError<T>> {
         unsafe {
             let handle = CreateMutexW(
-                security_attributes.as_mut().map(|x| &mut x.0 as *mut _).unwrap_or(null_mut()),
+                security_attributes
+                    .as_mut()
+                    .map(|x| &mut x.0 as *mut _)
+                    .unwrap_or(null_mut()),
                 0,
                 name.to_wide_null().as_ptr(),
             );
             if handle.is_null() {
-                return Err(InitError { data: data, error: Error::last() });
+                return Err(InitError {
+                    data,
+                    error: Error::last(),
+                });
             }
             Ok(Mutex(Handle::new(handle), data))
         }
     }
     pub fn open(data: T, name: &str) -> Result<Mutex<T>, InitError<T>> {
         unsafe {
-            let handle = OpenMutexW(
-                SYNCHRONIZE,
-                FALSE,
-                name.to_wide_null().as_ptr(),
-            );
+            let handle = OpenMutexW(SYNCHRONIZE, FALSE, name.to_wide_null().as_ptr());
             if handle.is_null() {
-                return Err(InitError { data: data, error: Error::last() });
+                return Err(InitError {
+                    data,
+                    error: Error::last(),
+                });
             }
             Ok(Mutex(Handle::new(handle), data))
         }
@@ -79,24 +85,32 @@ impl<T> Mutex<T> {
             }
         }
     }
-    pub fn try_clone(&self) -> Result<Mutex<T>, Error> where T: Clone {
+    pub fn try_clone(&self) -> Result<Mutex<T>, Error>
+    where
+        T: Clone,
+    {
         unsafe {
             let handle = Handle::duplicate_from(*self.0)?;
             Ok(Mutex(handle, self.1.clone()))
         }
     }
 }
-impl<T> Debug for Mutex<T> where T: Debug {
+impl<T> Debug for Mutex<T>
+where
+    T: Debug,
+{
     fn fmt(&self, f: &mut Formatter) -> Result<(), FmtError> {
         match self.wait(Some(0)) {
-            Ok(guard) => {
-                f.debug_struct("Mutex").field("handle", &*self.0)
-                    .field("data", &*guard).finish()
-            },
-            Err(err) => {
-                f.debug_struct("Mutex").field("handle", &*self.0)
-                    .field("data", &err).finish()
-            }
+            Ok(guard) => f
+                .debug_struct("Mutex")
+                .field("handle", &*self.0)
+                .field("data", &*guard)
+                .finish(),
+            Err(err) => f
+                .debug_struct("Mutex")
+                .field("handle", &*self.0)
+                .field("data", &err)
+                .finish(),
         }
     }
 }
@@ -119,10 +133,15 @@ impl<'a, T> Drop for MutexGuard<'a, T> {
         }
     }
 }
-impl<'a, T> Debug for MutexGuard<'a, T> where T: Debug {
+impl<'a, T> Debug for MutexGuard<'a, T>
+where
+    T: Debug,
+{
     fn fmt(&self, f: &mut Formatter) -> Result<(), FmtError> {
-        f.debug_struct("MutexGuard").field("handle", &*(self.0).0)
-            .field("data", &(self.0).1).finish()
+        f.debug_struct("MutexGuard")
+            .field("handle", &*(self.0).0)
+            .field("data", &(self.0).1)
+            .finish()
     }
 }
 impl<'a, T> Deref for MutexGuard<'a, T> {
@@ -141,7 +160,10 @@ impl<'a, T> AbandonedMutexGuard<'a, T> {
         MutexGuard(self.0, self.1)
     }
 }
-impl<'a, T> Debug for AbandonedMutexGuard<'a, T> where T: Debug {
+impl<'a, T> Debug for AbandonedMutexGuard<'a, T>
+where
+    T: Debug,
+{
     fn fmt(&self, f: &mut Formatter) -> Result<(), FmtError> {
         f.write_str("<abandoned>")
     }

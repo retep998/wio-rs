@@ -12,7 +12,10 @@ pub trait ToWide {
     fn to_wide(&self) -> Vec<u16>;
     fn to_wide_null(&self) -> Vec<u16>;
 }
-impl<T> ToWide for T where T: AsRef<OsStr> {
+impl<T> ToWide for T
+where
+    T: AsRef<OsStr>,
+{
     #[inline]
     fn to_wide(&self) -> Vec<u16> {
         self.as_ref().encode_wide().collect()
@@ -22,7 +25,10 @@ impl<T> ToWide for T where T: AsRef<OsStr> {
         self.as_ref().encode_wide().chain(Some(0)).collect()
     }
 }
-pub trait FromWide where Self: Sized {
+pub trait FromWide
+where
+    Self: Sized,
+{
     fn from_wide(wide: &[u16]) -> Self;
     #[inline]
     fn from_wide_null(wide: &[u16]) -> Self {
@@ -39,7 +45,7 @@ pub trait FromWide where Self: Sized {
         assert!(!wide.is_null());
         for i in 0.. {
             if *wide.offset(i) == 0 {
-                return Self::from_wide_ptr(wide, i as usize)
+                return Self::from_wide_ptr(wide, i as usize);
             }
         }
         unreachable!()
