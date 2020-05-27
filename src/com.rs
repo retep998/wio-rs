@@ -7,7 +7,6 @@ use std::fmt::{Debug, Error as FmtError, Formatter};
 use std::mem::forget;
 use std::ops::Deref;
 use std::ptr::{null_mut, NonNull};
-use winapi::ctypes::c_void;
 use winapi::um::unknwnbase::IUnknown;
 use winapi::shared::guiddef::GUID;
 use winapi::shared::winerror::HRESULT;
@@ -43,7 +42,6 @@ macro_rules! com_ptr_from_fn {
         |$(($guid:pat, $ptr:ident)),+ $(,)?| $init:expr
     ) => {{
         use winapi::Interface;
-        use winapi::ctypes::c_void;
         use winapi::shared::guiddef::GUID;
 
         // hack to get the GUID through type inference
@@ -61,7 +59,7 @@ macro_rules! com_ptr_from_fn {
         let result: winapi::shared::winerror::HRESULT = {
             $(
                 let $guid = &$ptr.guid();
-                let $ptr = &mut *(&mut ($ptr.0) as *mut *mut _ as *mut *mut c_void);
+                let $ptr = &mut *(&mut ($ptr.0) as *mut *mut _ as *mut *mut _);
             )+
             (|| $init)()
         };
@@ -118,10 +116,10 @@ impl<T> ComPtr<T> {
     ///
     /// If you're calling a COM function that generates multiple COM objects, use the
     /// [`com_ptr_from_fn!`](../macro.com_ptr_from_fn.html) macro.
-    pub unsafe fn from_fn<F>(fun: F) -> Result<ComPtr<T>, HRESULT>
+    pub unsafe fn from_fn<F, P>(fun: F) -> Result<ComPtr<T>, HRESULT>
     where
         T: Interface,
-        F: FnOnce(&GUID, &mut *mut c_void) -> HRESULT
+        F: FnOnce(&GUID, &mut *mut P) -> HRESULT
     {
         match com_ptr_from_fn!(|(guid, ptr)| fun(guid, ptr)) {
             Ok((p,)) => Ok(p),
