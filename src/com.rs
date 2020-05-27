@@ -13,6 +13,75 @@ use winapi::shared::guiddef::GUID;
 use winapi::shared::winerror::HRESULT;
 use winapi::Interface;
 
+#[doc(hidden)]
+#[macro_export]
+#[cfg(feature = "log")]
+macro_rules! log_if_feature {
+    ($($args:tt)*) => {log::warn!($($args)*)};
+}
+
+#[doc(hidden)]
+#[macro_export]
+#[cfg(not(feature = "log"))]
+macro_rules! log_if_feature {
+    ($($args:tt)*) => {};
+}
+
+/// Simplifies the common pattern of calling a function to initialize multiple `ComPtr`s.
+///
+/// This macro is a generalization of [`ComPtr::from_fn`][from_fn] to functions
+/// that output multiple COM objects. It returns `Result<($(ComPtr<_>,)+), HRESULT>`, where the
+/// `Ok` tuple contains the same number of `ComPtr` objects as the number of GUID/pointer pairs
+/// passed to this macro.
+///
+/// See [`ComPtr::from_fn`][from_fn] for details on the exact semantics.
+///
+/// [from_fn]: crate::com::ComPtr::from_fn
+#[macro_export]
+macro_rules! com_ptr_from_fn {
+    (
+        |$(($guid:pat, $ptr:ident)),+ $(,)?| $init:expr
+    ) => {{
+        use winapi::Interface;
+        use winapi::ctypes::c_void;
+        use winapi::shared::guiddef::GUID;
+
+        // hack to get the GUID through type inference
+        struct GuidHack<T: Interface>(*mut T);
+        impl<T: Interface> GuidHack<T> {
+            fn guid(&self) -> GUID {
+                T::uuidof()
+            }
+        }
+
+        $(
+            let mut $ptr = GuidHack(std::ptr::null_mut());
+        )+
+
+        let result: winapi::shared::winerror::HRESULT = {
+            $(
+                let $guid = &$ptr.guid();
+                let $ptr = &mut *(&mut ($ptr.0) as *mut *mut _ as *mut *mut c_void);
+            )+
+            (|| $init)()
+        };
+        $(
+            let $ptr = $crate::com::ComPtr::new($ptr.0);
+        )+
+        match result {
+            0 => Ok(($(
+                $ptr.expect(concat!("`", stringify!($expr), "` must set `", stringify!($ptr), "` to a value")),
+            )+)),
+            res => {
+                $(if $ptr.is_some() {
+                    $crate::log_if_feature!("ComPtr::from_fn had an initialized COM pointer despite the function returning an error");
+                })+
+                Err(res)
+            }
+        }
+    }};
+}
+
 // ComPtr to wrap COM interfaces sanely
 #[repr(transparent)]
 pub struct ComPtr<T>(NonNull<T>);
@@ -46,24 +115,17 @@ impl<T> ComPtr<T> {
     /// it. If the `log` feature is enabled, it will emit a warning when that happens.
     ///
     /// May leak the COM pointer if the function panics after initializing the pointer.
+    ///
+    /// If you're calling a COM function that generates multiple COM objects, use the
+    /// [`com_ptr_from_fn!`](../macro.com_ptr_from_fn.html) macro.
     pub unsafe fn from_fn<F, E>(fun: F) -> Result<ComPtr<T>, HRESULT>
     where
         T: Interface,
         F: FnOnce(&GUID, &mut *mut c_void) -> HRESULT
     {
-        let guid = T::uuidof();
-        let mut ptr = null_mut();
-        let res = fun(&guid, &mut ptr);
-        let com = ComPtr::new(ptr as *mut T);
-        match res {
-            0 => Ok(com.expect("fun must set its pointer to a value")),
-            _ => {
-                #[cfg(feature = "log")]
-                if com.is_some() {
-                    log::warn!("ComPtr::from_fn had an initialized COM pointer despite the function returning an error")
-                }
-                Err(res)
-            }
+        match com_ptr_from_fn!(|(guid, ptr)| fun(guid, ptr)) {
+            Ok((p,)) => Ok(p),
+            Err(e) => Err(e),
         }
     }
     /// Casts up the inheritance chain

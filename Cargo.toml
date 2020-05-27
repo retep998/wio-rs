@@ -63,6 +63,7 @@ winapi = { version = "0.3", features = [
     "mmdeviceapi",
     "processthreadsapi",
     "setupapi",
+    "shobjidl_core",
     "std",
     "synchapi",
     "unknwnbase",
