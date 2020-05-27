@@ -7,7 +7,10 @@ use std::fmt::{Debug, Error as FmtError, Formatter};
 use std::mem::forget;
 use std::ops::Deref;
 use std::ptr::{null_mut, NonNull};
+use winapi::ctypes::c_void;
 use winapi::um::unknwnbase::IUnknown;
+use winapi::shared::guiddef::GUID;
+use winapi::shared::winerror::HRESULT;
 use winapi::Interface;
 
 // ComPtr to wrap COM interfaces sanely
@@ -33,27 +36,33 @@ impl<T> ComPtr<T> {
     {
         ComPtr(NonNull::new(ptr).expect("ptr should not be null"))
     }
-    /// Simplifies the common pattern of calling a function to initialize a ComPtr.
+    /// Simplifies the common pattern of calling a function to initialize a `ComPtr`.
+    ///
+    /// `fun` gets passed `T`'s `GUID` and a mutable reference to a null pointer. If `fun` returns
+    /// `S_OK`, it _must_ initialize the pointer to a non-null value.
+    ///
+    /// If `fun` *doesn't* return `S_OK` but still initializes the pointer, this function will
+    /// assume that the pointer was initialized to a valid COM object and will call `Release` on
+    /// it. If the `log` feature is enabled, it will emit a warning when that happens.
+    ///
     /// May leak the COM pointer if the function panics after initializing the pointer.
-    /// The pointer provided to the function starts as a null pointer.
-    /// If the pointer is initialized to a non-null value, it will be interpreted as a valid COM
-    /// pointer, even if the function returns an error in which case it will be released by
-    /// `from_fn` and a warning logged if logging is enabled.
-    pub unsafe fn from_fn<F, E>(fun: F) -> Result<Option<ComPtr<T>>, E>
+    pub unsafe fn from_fn<F, E>(fun: F) -> Result<ComPtr<T>, HRESULT>
     where
         T: Interface,
-        F: FnOnce(&mut *mut T) -> Result<(), E>,
+        F: FnOnce(&GUID, &mut *mut c_void) -> HRESULT
     {
+        let guid = T::uuidof();
         let mut ptr = null_mut();
-        let res = fun(&mut ptr);
-        let com = ComPtr::new(ptr);
+        let res = fun(&guid, &mut ptr);
+        let com = ComPtr::new(ptr as *mut T);
         match res {
-            Ok(()) => Ok(com),
-            Err(err) => {
+            0 => Ok(com.expect("fun must set its pointer to a value")),
+            _ => {
+                #[cfg(feature = "log")]
                 if com.is_some() {
-                    #[cfg(feature = "log")] log::warn!("ComPtr::from_fn had an initialized COM pointer despite the function returning an error")
+                    log::warn!("ComPtr::from_fn had an initialized COM pointer despite the function returning an error")
                 }
-                Err(err)
+                Err(res)
             }
         }
     }
