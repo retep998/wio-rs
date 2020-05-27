@@ -16,5 +16,8 @@ winapi = { version = "0.3", features = [
 ] }
 log = { version = "0.4", optional = true }
 
+[package.metadata.docs.rs]
+default-target = "x86_64-pc-windows-msvc"
+
 [dev-dependencies]
 rand = "0.4"
