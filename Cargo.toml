@@ -10,14 +10,14 @@ keywords = ["windows", "ffi", "win32", "com"]
 categories = ["api-bindings", "os::windows-apis"]
 include = ["/src/**/*", "/Cargo.toml", "/LICENSE-MIT", "/LICENSE-APACHE", "/build.rs", "/README.md"]
 
+[package.metadata.docs.rs]
+default-target = "x86_64-pc-windows-msvc"
+
 [dependencies]
 winapi = { version = "0.3", features = [
     "consoleapi", "errhandlingapi", "fileapi", "handleapi", "minwinbase", "minwindef", "processthreadsapi", "std", "synchapi", "unknwnbase", "winbase", "wincon", "winerror", "winnt",
 ] }
 log = { version = "0.4", optional = true }
-
-[package.metadata.docs.rs]
-default-target = "x86_64-pc-windows-msvc"
 
 [dev-dependencies]
 rand = "0.4"
