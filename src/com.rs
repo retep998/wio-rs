@@ -118,7 +118,7 @@ impl<T> ComPtr<T> {
     ///
     /// If you're calling a COM function that generates multiple COM objects, use the
     /// [`com_ptr_from_fn!`](../macro.com_ptr_from_fn.html) macro.
-    pub unsafe fn from_fn<F, E>(fun: F) -> Result<ComPtr<T>, HRESULT>
+    pub unsafe fn from_fn<F>(fun: F) -> Result<ComPtr<T>, HRESULT>
     where
         T: Interface,
         F: FnOnce(&GUID, &mut *mut c_void) -> HRESULT
