@@ -7,8 +7,17 @@ use std::fmt::{Debug, Error as FmtError, Formatter};
 use std::mem::forget;
 use std::ops::Deref;
 use std::ptr::{null_mut, NonNull};
-use winapi::um::unknwnbase::IUnknown;
-use winapi::Interface;
+use winapi::{
+    shared::{
+        minwindef::DWORD,
+        winerror::HRESULT,
+    },
+    um::{
+        combaseapi,
+        unknwnbase::IUnknown,
+    }
+};
+use winapi::{Class, Interface};
 
 // ComPtr to wrap COM interfaces sanely
 #[repr(transparent)]
@@ -57,6 +66,34 @@ impl<T> ComPtr<T> {
             }
         }
     }
+    /// Instantiate the given class type.
+    ///
+    /// This is a shorthand for [`CoCreateInstance`], using `C` and `T`'s `GUID`s for `rclsid` and
+    /// `riid`, respectively. `cls_context` is passed into [`CoCreateInstance`]'s `dwClsContext`
+    /// parameter, so see that documentation for details on what to pass for it.
+    ///
+    /// Returns `Err(HRESULT)` if the call to [`CoCreateInstance`] failed.
+    ///
+    /// [`CoCreateInstance`]: https://docs.microsoft.com/en-us/windows/win32/api/combaseapi/nf-combaseapi-cocreateinstance
+    pub fn new_class<C: Class>(cls_context: DWORD) -> Result<ComPtr<T>, HRESULT>
+        where T: Interface
+    {
+        unsafe {
+            let mut raw_ptr: *mut T = null_mut();
+            let hr = combaseapi::CoCreateInstance(
+                &C::uuidof(),
+                null_mut(),
+                cls_context,
+                &T::uuidof(),
+                &mut raw_ptr as *mut _ as *mut _,
+            );
+            if hr == 0 {
+                Ok(ComPtr::from_raw(raw_ptr))
+            } else {
+                Err(hr)
+            }
+        }
+    }
     /// Casts up the inheritance chain
     pub fn up<U>(self) -> ComPtr<U>
     where
@@ -77,7 +114,7 @@ impl<T> ComPtr<T> {
         unsafe { &*(self.as_raw() as *mut IUnknown) }
     }
     /// Performs QueryInterface fun.
-    pub fn cast<U>(&self) -> Result<ComPtr<U>, i32>
+    pub fn cast<U>(&self) -> Result<ComPtr<U>, HRESULT>
     where
         U: Interface,
     {
