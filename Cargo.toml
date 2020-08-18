@@ -8,13 +8,61 @@ repository = "https://github.com/retep998/wio-rs"
 readme = "README.md"
 keywords = ["windows", "ffi", "win32", "com"]
 categories = ["api-bindings", "os::windows-apis"]
-include = ["/src/**/*", "/Cargo.toml", "/LICENSE-MIT", "/LICENSE-APACHE", "/build.rs", "/README.md"]
+include = [
+    "/src/**/*",
+    "/Cargo.toml",
+    "/LICENSE-MIT",
+    "/LICENSE-APACHE",
+    "/build.rs",
+    "/README.md",
+]
 
 [dependencies]
-winapi = { version = "0.3", features = [
-    "consoleapi", "errhandlingapi", "fileapi", "handleapi", "minwinbase", "minwindef", "processthreadsapi", "std", "synchapi", "unknwnbase", "winbase", "wincon", "winerror", "winnt",
-] }
 log = { version = "0.4", optional = true }
+winapi = { version = "0.3", features = [
+    "consoleapi",
+    "errhandlingapi",
+    "fileapi",
+    "handleapi",
+    "minwinbase",
+    "minwindef",
+    "processthreadsapi",
+    "std",
+    "synchapi",
+    "unknwnbase",
+    "winbase",
+    "wincon",
+    "winerror",
+    "winnt",
+] }
 
 [dev-dependencies]
 rand = "0.4"
+winapi = { version = "0.3", features = [
+    "combaseapi",
+    "consoleapi",
+    "devpkey",
+    "devpropdef",
+    "errhandlingapi",
+    "fileapi",
+    "handleapi",
+    "hidclass",
+    "ioapiset",
+    "minwinbase",
+    "minwindef",
+    "mmdeviceapi",
+    "processthreadsapi",
+    "setupapi",
+    "std",
+    "synchapi",
+    "unknwnbase",
+    "usbioctl",
+    "usbiodef",
+    "winbase",
+    "wincon",
+    "winerror",
+    "winnt",
+] }
+
+[patch.crates-io]
+winapi = { git = "https://github.com/retep998/winapi-rs", branch = "0.3" }

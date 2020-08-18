@@ -75,7 +75,7 @@ impl<T> Mutex<T> {
     }
     /// The timeout is specified in milliseconds
     /// Specifying None for the timeout means to wait forever
-    pub fn wait<'a>(&'a self, timeout: Option<u32>) -> Result<MutexGuard<'a, T>, WaitError<'a, T>> {
+    pub fn wait(&self, timeout: Option<u32>) -> Result<MutexGuard<'_, T>, WaitError<'_, T>> {
         unsafe {
             match WaitForSingleObject(*self.0, timeout.unwrap_or(INFINITE)) {
                 WAIT_ABANDONED => Err(WaitError::Abandoned(AbandonedMutexGuard::new(self))),

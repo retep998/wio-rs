@@ -4,14 +4,16 @@
 // All files in the project carrying such notice may not be copied, modified, or distributed
 // except according to those terms.
 #![cfg(windows)]
+#![allow(clippy::missing_safety_doc, clippy::len_without_is_empty)]
 extern crate winapi;
 
 // pub mod apc;
 pub mod com;
 pub mod console;
 pub mod error;
-pub(crate) mod handle;
+pub mod handle;
 pub mod mutex;
+pub mod vsb;
 // pub mod perf;
 // pub mod pipe;
 // pub mod sleep;

@@ -10,12 +10,12 @@ use std::{
     ptr::null_mut,
 };
 use winapi::{
+    shared::minwindef::FALSE,
     um::{
         handleapi::{CloseHandle, DuplicateHandle},
         processthreadsapi::GetCurrentProcess,
         winnt::{DUPLICATE_SAME_ACCESS, HANDLE},
     },
-    shared::minwindef::FALSE,
 };
 
 pub struct Handle(HANDLE);
@@ -34,8 +34,13 @@ impl Handle {
     pub unsafe fn duplicate_from(handle: HANDLE) -> Result<Handle> {
         let mut new_handle = null_mut();
         let res = DuplicateHandle(
-            GetCurrentProcess(), handle, GetCurrentProcess(),
-            &mut new_handle, 0, FALSE, DUPLICATE_SAME_ACCESS,
+            GetCurrentProcess(),
+            handle,
+            GetCurrentProcess(),
+            &mut new_handle,
+            0,
+            FALSE,
+            DUPLICATE_SAME_ACCESS,
         );
         match res {
             0 => Error::last_result(),
@@ -50,7 +55,9 @@ impl AsRawHandle for Handle {
 }
 impl Deref for Handle {
     type Target = HANDLE;
-    fn deref(&self) -> &HANDLE { &self.0 }
+    fn deref(&self) -> &HANDLE {
+        &self.0
+    }
 }
 impl Drop for Handle {
     fn drop(&mut self) {
