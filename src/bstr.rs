@@ -5,6 +5,7 @@
 // except according to those terms.
 use crate::wide::{FromWide, ToWide};
 use std::{
+    alloc::{handle_alloc_error, Layout},
     convert::TryInto,
     ffi::{OsStr, OsString},
     path::PathBuf,
@@ -23,14 +24,21 @@ impl BStr {
         BStr(s)
     }
     pub fn from_wide(s: &[u16]) -> BStr {
-        unsafe { BStr(SysAllocStringLen(s.as_ptr(), s.len().try_into().unwrap())) }
+        unsafe {
+            let ptr = SysAllocStringLen(s.as_ptr(), s.len().try_into().unwrap());
+            if ptr.is_null() {
+                handle_alloc_error(Layout::array::<u16>(s.len()).unwrap())
+            }
+            BStr(ptr)
+        }
     }
     pub fn from_bytes(s: &[u8]) -> BStr {
         unsafe {
-            BStr(SysAllocStringByteLen(
-                s.as_ptr().cast(),
-                s.len().try_into().unwrap(),
-            ))
+            let ptr = SysAllocStringByteLen(s.as_ptr().cast(), s.len().try_into().unwrap());
+            if ptr.is_null() {
+                handle_alloc_error(Layout::array::<u8>(s.len()).unwrap())
+            }
+            BStr(ptr)
         }
     }
     pub fn len(&self) -> usize {
