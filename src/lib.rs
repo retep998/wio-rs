@@ -8,16 +8,17 @@
 extern crate winapi;
 
 // pub mod apc;
+pub mod bstr;
 pub mod com;
 pub mod console;
 pub mod error;
 pub mod handle;
 pub mod mutex;
-pub mod vsb;
 // pub mod perf;
 // pub mod pipe;
 // pub mod sleep;
 // pub mod thread;
+pub mod vsb;
 pub mod wide;
 
 pub use error::{Error, Result};
