@@ -73,6 +73,15 @@ impl BStr {
             unsafe { from_raw_parts(self.0.cast(), self.byte_len() + 1) }
         }
     }
+    pub fn to_string(&self) -> Option<String> {
+        let os: OsString = self.into();
+        os.into_string().ok()
+    }
+    pub fn to_string_lossy(&self) -> String {
+        let os: OsString = self.into();
+        os.into_string()
+            .unwrap_or_else(|os| os.to_string_lossy().into_owned())
+    }
 }
 impl Clone for BStr {
     fn clone(&self) -> BStr {
@@ -92,13 +101,13 @@ where
         BStr::from_wide(&s.to_wide())
     }
 }
-impl From<BStr> for OsString {
-    fn from(s: BStr) -> OsString {
+impl From<&BStr> for OsString {
+    fn from(s: &BStr) -> OsString {
         OsString::from_wide(s.as_wide())
     }
 }
-impl From<BStr> for PathBuf {
-    fn from(s: BStr) -> PathBuf {
+impl From<&BStr> for PathBuf {
+    fn from(s: &BStr) -> PathBuf {
         PathBuf::from_wide(s.as_wide())
     }
 }
