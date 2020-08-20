@@ -6,7 +6,8 @@
 use std::{
     alloc::{alloc, alloc_zeroed, dealloc, handle_alloc_error, realloc, Layout},
     marker::PhantomData,
-    mem::align_of,
+    mem::{align_of, size_of},
+    slice::{from_raw_parts, from_raw_parts_mut},
 };
 pub struct VariableSizedBox<T> {
     size: usize,
@@ -66,9 +67,43 @@ impl<T> VariableSizedBox<T> {
         let offset = o as isize - self.data as isize;
         (self.data as *const u8).offset(offset).cast()
     }
-    pub unsafe fn sanitize_ptr_mut<U>(&self, o: *mut U) -> *mut U {
+    pub unsafe fn sanitize_mut_ptr<U>(&mut self, o: *mut U) -> *mut U {
         let offset = o as isize - self.data as isize;
         (self.data as *mut u8).offset(offset).cast()
+    }
+    pub unsafe fn slice_from_count<U>(&self, o: *const U, count: usize) -> &[U] {
+        let ptr = self.sanitize_ptr(o);
+        assert!(ptr >= self.data.cast());
+        assert!(count.saturating_mul(size_of::<U>()) <= self.size);
+        assert!(ptr.wrapping_add(count) <= self.data.cast::<u8>().add(self.size).cast());
+        from_raw_parts(ptr, count)
+    }
+    pub unsafe fn slice_from_count_mut<U>(&mut self, o: *mut U, count: usize) -> &mut [U] {
+        let ptr = self.sanitize_mut_ptr(o);
+        assert!(ptr >= self.data.cast());
+        assert!(count.saturating_mul(size_of::<U>()) <= self.size);
+        assert!(ptr.wrapping_add(count) <= self.data.cast::<u8>().add(self.size).cast());
+        from_raw_parts_mut(ptr, count)
+    }
+    pub unsafe fn slice_from_bytes<U>(&self, o: *const U, bytes: usize) -> &[U] {
+        let count = bytes / size_of::<U>();
+        self.slice_from_count(o, count)
+    }
+    pub unsafe fn slice_from_bytes_mut<U>(&mut self, o: *mut U, bytes: usize) -> &mut [U] {
+        let count = bytes / size_of::<U>();
+        self.slice_from_count_mut(o, count)
+    }
+    pub unsafe fn slice_from_total_bytes<U>(&self, o: *const U, total_bytes: usize) -> &[U] {
+        let bytes = total_bytes - (o as usize - self.data as usize);
+        self.slice_from_bytes(o, bytes)
+    }
+    pub unsafe fn slice_from_total_bytes_mut<U>(
+        &mut self,
+        o: *mut U,
+        total_bytes: usize,
+    ) -> &mut [U] {
+        let bytes = total_bytes - (o as usize - self.data as usize);
+        self.slice_from_bytes_mut(o, bytes)
     }
 }
 impl<T> Drop for VariableSizedBox<T> {
