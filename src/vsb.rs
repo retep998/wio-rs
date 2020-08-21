@@ -85,16 +85,16 @@ impl<T> VariableSizedBox<T> {
     /// # Safety
     /// `o` must be a valid pointer within the allocation contained by this box.
     pub unsafe fn sanitize_ptr<U>(&self, o: *const U) -> *const U {
-        let offset = o as isize - self.data as isize;
-        (self.data as *const u8).offset(offset).cast()
+        let offset = o as usize - self.data as usize;
+        (self.data as *const u8).add(offset).cast()
     }
     /// Given a pointer to a specific field, upgrades the provenance of the pointer to the entire
     /// allocation to work around stacked borrows.
     /// # Safety
     /// `o` must be a valid pointer within the allocation contained by this box.
     pub unsafe fn sanitize_mut_ptr<U>(&mut self, o: *mut U) -> *mut U {
-        let offset = o as isize - self.data as isize;
-        (self.data as *mut u8).offset(offset).cast()
+        let offset = o as usize - self.data as usize;
+        (self.data as *mut u8).add(offset).cast()
     }
     /// Given a pointer to a variable sized array field and the length of the array in elements,
     /// returns a slice to the entire variable sized array.
