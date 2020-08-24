@@ -7,6 +7,7 @@ use std::{
     alloc::{alloc, alloc_zeroed, dealloc, handle_alloc_error, realloc, Layout},
     marker::PhantomData,
     mem::{align_of, size_of},
+    ptr::NonNull,
     slice::{from_raw_parts, from_raw_parts_mut},
 };
 /// This is a smart pointer type for holding FFI types whose size varies.
@@ -14,67 +15,68 @@ use std::{
 /// by either another field, or an external source of information.
 pub struct VariableSizedBox<T> {
     size: usize,
-    data: *mut T,
+    data: NonNull<T>,
     pd: PhantomData<T>,
 }
 impl<T> VariableSizedBox<T> {
     /// The size is specified in bytes. The data is uninitialized.
     pub fn new(size: usize) -> VariableSizedBox<T> {
         let layout = Layout::from_size_align(size, align_of::<T>()).unwrap();
-        let data = unsafe { alloc(layout) };
-        if data.is_null() {
+        if let Some(data) = NonNull::new(unsafe { alloc(layout) }) {
+            VariableSizedBox {
+                size,
+                data: data.cast(),
+                pd: PhantomData,
+            }
+        } else {
             handle_alloc_error(layout)
-        }
-        VariableSizedBox {
-            size,
-            data: data.cast(),
-            pd: PhantomData,
         }
     }
     /// The size is specified in bytes. The data is zeroed.
     pub fn zeroed(size: usize) -> VariableSizedBox<T> {
         let layout = Layout::from_size_align(size, align_of::<T>()).unwrap();
-        let data = unsafe { alloc_zeroed(layout) };
-        if data.is_null() {
+        if let Some(data) = NonNull::new(unsafe { alloc_zeroed(layout) }) {
+            VariableSizedBox {
+                size,
+                data: data.cast(),
+                pd: PhantomData,
+            }
+        } else {
             handle_alloc_error(layout)
-        }
-        VariableSizedBox {
-            size,
-            data: data.cast(),
-            pd: PhantomData,
         }
     }
     /// Use this to get a pointer to pass to FFI functions.
     pub fn as_ptr(&self) -> *const T {
-        self.data
+        self.data.as_ptr()
     }
     /// Use this to get a pointer to pass to FFI functions.
     pub fn as_mut_ptr(&mut self) -> *mut T {
-        self.data
+        self.data.as_ptr()
     }
     /// This is used to more safely access the fixed size fields.
     /// # Safety
     /// The current data must be valid for an instance of `T`.
     pub unsafe fn as_ref(&self) -> &T {
-        &*self.data
+        self.data.as_ref()
     }
     /// This is used to more safely access the fixed size fields.
     /// # Safety
     /// The current data must be valid for an instance of `T`.
     pub unsafe fn as_mut_ref(&mut self) -> &mut T {
-        &mut *self.data
+        self.data.as_mut()
     }
     /// The size is specified in bytes.
     /// If this grows the allocation, the extra bytes will be uninitialized.
     /// I wish I could provide a zeroed alternative but Rust's stable allocators are lacking.
     pub fn resize(&mut self, size: usize) {
         let layout = Layout::from_size_align(self.size, align_of::<T>()).unwrap();
-        let data = unsafe { realloc(self.data.cast(), layout, size) };
-        if data.is_null() {
+        if let Some(data) = NonNull::new(unsafe { realloc(self.as_mut_ptr().cast(), layout, size) })
+        {
+            self.data = data.cast();
+            self.size = size;
+        } else {
             handle_alloc_error(layout)
         }
-        self.data = data.cast();
-        self.size = size;
     }
     /// The length of the allocation specified in bytes.
     pub fn len(&self) -> usize {
@@ -85,16 +87,16 @@ impl<T> VariableSizedBox<T> {
     /// # Safety
     /// `o` must be a valid pointer within the allocation contained by this box.
     pub unsafe fn sanitize_ptr<U>(&self, o: *const U) -> *const U {
-        let offset = o as usize - self.data as usize;
-        (self.data as *const u8).add(offset).cast()
+        let offset = o as usize - self.as_ptr() as usize;
+        (self.as_ptr() as *const u8).add(offset).cast()
     }
     /// Given a pointer to a specific field, upgrades the provenance of the pointer to the entire
     /// allocation to work around stacked borrows.
     /// # Safety
     /// `o` must be a valid pointer within the allocation contained by this box.
     pub unsafe fn sanitize_mut_ptr<U>(&mut self, o: *mut U) -> *mut U {
-        let offset = o as usize - self.data as usize;
-        (self.data as *mut u8).add(offset).cast()
+        let offset = o as usize - self.as_ptr() as usize;
+        (self.as_mut_ptr() as *mut u8).add(offset).cast()
     }
     /// Given a pointer to a variable sized array field and the length of the array in elements,
     /// returns a slice to the entire variable sized array.
@@ -103,9 +105,9 @@ impl<T> VariableSizedBox<T> {
     /// contained by this box, and the data must be valid for the specified type.
     pub unsafe fn slice_from_count<U>(&self, o: *const U, count: usize) -> &[U] {
         let ptr = self.sanitize_ptr(o);
-        assert!(ptr >= self.data.cast());
+        assert!(ptr >= self.as_ptr().cast());
         assert!(count.saturating_mul(size_of::<U>()) <= self.size);
-        assert!(ptr.wrapping_add(count) <= self.data.cast::<u8>().add(self.size).cast());
+        assert!(ptr.wrapping_add(count) <= self.as_ptr().cast::<u8>().add(self.size).cast());
         from_raw_parts(ptr, count)
     }
     /// Given a pointer to a variable sized array field and the length of the array in elements,
@@ -115,9 +117,9 @@ impl<T> VariableSizedBox<T> {
     /// contained by this box, and the data must be valid for the specified type.
     pub unsafe fn slice_from_count_mut<U>(&mut self, o: *mut U, count: usize) -> &mut [U] {
         let ptr = self.sanitize_mut_ptr(o);
-        assert!(ptr >= self.data.cast());
+        assert!(ptr >= self.as_mut_ptr().cast());
         assert!(count.saturating_mul(size_of::<U>()) <= self.size);
-        assert!(ptr.wrapping_add(count) <= self.data.cast::<u8>().add(self.size).cast());
+        assert!(ptr.wrapping_add(count) <= self.as_mut_ptr().cast::<u8>().add(self.size).cast());
         from_raw_parts_mut(ptr, count)
     }
     /// Given a pointer to a variable sized array field and the length of the array in bytes,
@@ -144,7 +146,7 @@ impl<T> VariableSizedBox<T> {
     /// The slice as specified by `o` and `total_bytes` must be entirely within the allocation
     /// contained by this box, and the data must be valid for the specified type.
     pub unsafe fn slice_from_total_bytes<U>(&self, o: *const U, total_bytes: usize) -> &[U] {
-        let bytes = total_bytes - (o as usize - self.data as usize);
+        let bytes = total_bytes - (o as usize - self.as_ptr() as usize);
         self.slice_from_bytes(o, bytes)
     }
     /// Given a pointer to a variable sized array field and the size of the entire struct in bytes
@@ -158,13 +160,13 @@ impl<T> VariableSizedBox<T> {
         o: *mut U,
         total_bytes: usize,
     ) -> &mut [U] {
-        let bytes = total_bytes - (o as usize - self.data as usize);
+        let bytes = total_bytes - (o as usize - self.as_ptr() as usize);
         self.slice_from_bytes_mut(o, bytes)
     }
 }
 impl<T> Drop for VariableSizedBox<T> {
     fn drop(&mut self) {
         let layout = Layout::from_size_align(self.size, align_of::<T>()).unwrap();
-        unsafe { dealloc(self.data.cast(), layout) }
+        unsafe { dealloc(self.as_mut_ptr().cast(), layout) }
     }
 }
