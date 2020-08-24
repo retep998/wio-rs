@@ -7,7 +7,7 @@ use std::{
     alloc::{alloc, alloc_zeroed, dealloc, handle_alloc_error, realloc, Layout},
     marker::PhantomData,
     mem::{align_of, size_of},
-    ptr::NonNull,
+    ptr::{self, NonNull},
     slice::{from_raw_parts, from_raw_parts_mut},
 };
 /// This is a smart pointer type for holding FFI types whose size varies.
@@ -21,6 +21,13 @@ pub struct VariableSizedBox<T> {
 impl<T> VariableSizedBox<T> {
     /// The size is specified in bytes. The data is uninitialized.
     pub fn new(size: usize) -> VariableSizedBox<T> {
+        if size == 0 {
+            return VariableSizedBox {
+                size: 0,
+                data: NonNull::dangling(),
+                pd: PhantomData,
+            };
+        }
         let layout = Layout::from_size_align(size, align_of::<T>()).unwrap();
         if let Some(data) = NonNull::new(unsafe { alloc(layout) }) {
             VariableSizedBox {
@@ -34,6 +41,13 @@ impl<T> VariableSizedBox<T> {
     }
     /// The size is specified in bytes. The data is zeroed.
     pub fn zeroed(size: usize) -> VariableSizedBox<T> {
+        if size == 0 {
+            return VariableSizedBox {
+                size: 0,
+                data: NonNull::dangling(),
+                pd: PhantomData,
+            };
+        }
         let layout = Layout::from_size_align(size, align_of::<T>()).unwrap();
         if let Some(data) = NonNull::new(unsafe { alloc_zeroed(layout) }) {
             VariableSizedBox {
@@ -47,11 +61,19 @@ impl<T> VariableSizedBox<T> {
     }
     /// Use this to get a pointer to pass to FFI functions.
     pub fn as_ptr(&self) -> *const T {
-        self.data.as_ptr()
+        if self.size == 0 {
+            ptr::null()
+        } else {
+            self.data.as_ptr()
+        }
     }
     /// Use this to get a pointer to pass to FFI functions.
     pub fn as_mut_ptr(&mut self) -> *mut T {
-        self.data.as_ptr()
+        if self.size == 0 {
+            ptr::null_mut()
+        } else {
+            self.data.as_ptr()
+        }
     }
     /// This is used to more safely access the fixed size fields.
     /// # Safety
@@ -69,6 +91,10 @@ impl<T> VariableSizedBox<T> {
     /// If this grows the allocation, the extra bytes will be uninitialized.
     /// I wish I could provide a zeroed alternative but Rust's stable allocators are lacking.
     pub fn resize(&mut self, size: usize) {
+        if self.size == 0 || size == 0 {
+            *self = VariableSizedBox::new(size);
+            return;
+        }
         let layout = Layout::from_size_align(self.size, align_of::<T>()).unwrap();
         if let Some(data) = NonNull::new(unsafe { realloc(self.as_mut_ptr().cast(), layout, size) })
         {
@@ -166,6 +192,9 @@ impl<T> VariableSizedBox<T> {
 }
 impl<T> Drop for VariableSizedBox<T> {
     fn drop(&mut self) {
+        if self.size == 0 {
+            return;
+        }
         let layout = Layout::from_size_align(self.size, align_of::<T>()).unwrap();
         unsafe { dealloc(self.as_mut_ptr().cast(), layout) }
     }
