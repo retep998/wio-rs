@@ -8,6 +8,7 @@ use std::{
     ops::Deref,
     os::windows::io::{AsRawHandle, FromRawHandle, IntoRawHandle},
     ptr::null_mut,
+    mem::ManuallyDrop,
 };
 use winapi::{
     shared::minwindef::FALSE,
@@ -73,6 +74,6 @@ impl FromRawHandle for Handle {
 }
 impl IntoRawHandle for Handle {
     fn into_raw_handle(self) -> HANDLE {
-        self.0
+        ManuallyDrop::new(self).0
     }
 }
