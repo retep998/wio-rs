@@ -22,11 +22,7 @@ impl<T> VariableSizedBox<T> {
     /// The size is specified in bytes. The data is uninitialized.
     pub fn new(size: usize) -> VariableSizedBox<T> {
         if size == 0 {
-            return VariableSizedBox {
-                size: 0,
-                data: NonNull::dangling(),
-                pd: PhantomData,
-            };
+            return VariableSizedBox::default();
         }
         let layout = Layout::from_size_align(size, align_of::<T>()).unwrap();
         if let Some(data) = NonNull::new(unsafe { alloc(layout) }) {
@@ -42,11 +38,7 @@ impl<T> VariableSizedBox<T> {
     /// The size is specified in bytes. The data is zeroed.
     pub fn zeroed(size: usize) -> VariableSizedBox<T> {
         if size == 0 {
-            return VariableSizedBox {
-                size: 0,
-                data: NonNull::dangling(),
-                pd: PhantomData,
-            };
+            return VariableSizedBox::default();
         }
         let layout = Layout::from_size_align(size, align_of::<T>()).unwrap();
         if let Some(data) = NonNull::new(unsafe { alloc_zeroed(layout) }) {
@@ -197,5 +189,14 @@ impl<T> Drop for VariableSizedBox<T> {
         }
         let layout = Layout::from_size_align(self.size, align_of::<T>()).unwrap();
         unsafe { dealloc(self.as_mut_ptr().cast(), layout) }
+    }
+}
+impl<T> Default for VariableSizedBox<T> {
+    fn default() -> Self {
+        VariableSizedBox {
+            size: 0,
+            data: NonNull::dangling(),
+            pd: PhantomData,
+        }
     }
 }
