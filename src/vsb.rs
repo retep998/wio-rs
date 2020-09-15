@@ -71,12 +71,14 @@ impl<T> VariableSizedBox<T> {
     /// # Safety
     /// The current data must be valid for an instance of `T`.
     pub unsafe fn as_ref(&self) -> &T {
+        assert!(self.size >= size_of::<T>());
         self.data.as_ref()
     }
     /// This is used to more safely access the fixed size fields.
     /// # Safety
     /// The current data must be valid for an instance of `T`.
     pub unsafe fn as_mut_ref(&mut self) -> &mut T {
+        assert!(self.size >= size_of::<T>());
         self.data.as_mut()
     }
     /// The size is specified in bytes.
@@ -104,16 +106,16 @@ impl<T> VariableSizedBox<T> {
     /// allocation to work around stacked borrows.
     /// # Safety
     /// `o` must be a valid pointer within the allocation contained by this box.
-    pub unsafe fn sanitize_ptr<U>(&self, o: *const U) -> *const U {
-        let offset = o as usize - self.as_ptr() as usize;
+    pub unsafe fn sanitize_ptr<U>(&self, ptr: *const U) -> *const U {
+        let offset = ptr as usize - self.as_ptr() as usize;
         (self.as_ptr() as *const u8).add(offset).cast()
     }
     /// Given a pointer to a specific field, upgrades the provenance of the pointer to the entire
     /// allocation to work around stacked borrows.
     /// # Safety
     /// `o` must be a valid pointer within the allocation contained by this box.
-    pub unsafe fn sanitize_mut_ptr<U>(&mut self, o: *mut U) -> *mut U {
-        let offset = o as usize - self.as_ptr() as usize;
+    pub unsafe fn sanitize_mut_ptr<U>(&mut self, ptr: *mut U) -> *mut U {
+        let offset = ptr as usize - self.as_ptr() as usize;
         (self.as_mut_ptr() as *mut u8).add(offset).cast()
     }
     /// Given a pointer to a variable sized array field and the length of the array in elements,
@@ -121,51 +123,51 @@ impl<T> VariableSizedBox<T> {
     /// # Safety
     /// The slice as specified by `o` and `count` must be entirely within the allocation
     /// contained by this box, and the data must be valid for the specified type.
-    pub unsafe fn slice_from_count<U>(&self, o: *const U, count: usize) -> &[U] {
-        let ptr = self.sanitize_ptr(o);
+    pub unsafe fn slice_from_count<U>(&self, ptr: *const U, count: usize) -> &[U] {
         assert!(ptr >= self.as_ptr().cast());
-        assert!(count.saturating_mul(size_of::<U>()) <= self.size);
+        assert!(count.checked_mul(size_of::<U>()).unwrap() <= self.size);
+        assert!(ptr.wrapping_add(count) >= ptr);
         assert!(ptr.wrapping_add(count) <= self.as_ptr().cast::<u8>().add(self.size).cast());
-        from_raw_parts(ptr, count)
+        from_raw_parts(self.sanitize_ptr(ptr), count)
     }
     /// Given a pointer to a variable sized array field and the length of the array in elements,
     /// returns a mutable slice to the entire variable sized array.
     /// # Safety
     /// The slice as specified by `o` and `count` must be entirely within the allocation
     /// contained by this box, and the data must be valid for the specified type.
-    pub unsafe fn slice_from_count_mut<U>(&mut self, o: *mut U, count: usize) -> &mut [U] {
-        let ptr = self.sanitize_mut_ptr(o);
+    pub unsafe fn slice_from_count_mut<U>(&mut self, ptr: *mut U, count: usize) -> &mut [U] {
         assert!(ptr >= self.as_mut_ptr().cast());
-        assert!(count.saturating_mul(size_of::<U>()) <= self.size);
+        assert!(count.checked_mul(size_of::<U>()).unwrap() <= self.size);
+        assert!(ptr.wrapping_add(count) >= ptr);
         assert!(ptr.wrapping_add(count) <= self.as_mut_ptr().cast::<u8>().add(self.size).cast());
-        from_raw_parts_mut(ptr, count)
+        from_raw_parts_mut(self.sanitize_mut_ptr(ptr), count)
     }
     /// Given a pointer to a variable sized array field and the length of the array in bytes,
     /// returns a slice to the entire variable sized array.
     /// # Safety
     /// The slice as specified by `o` and `bytes` must be entirely within the allocation
     /// contained by this box, and the data must be valid for the specified type.
-    pub unsafe fn slice_from_bytes<U>(&self, o: *const U, bytes: usize) -> &[U] {
+    pub unsafe fn slice_from_bytes<U>(&self, ptr: *const U, bytes: usize) -> &[U] {
         let count = bytes / size_of::<U>();
-        self.slice_from_count(o, count)
+        self.slice_from_count(ptr, count)
     }
     /// Given a pointer to a variable sized array field and the length of the array in bytes,
     /// returns a mutable slice to the entire variable sized array.
     /// # Safety
     /// The slice as specified by `o` and `bytes` must be entirely within the allocation
     /// contained by this box, and the data must be valid for the specified type.
-    pub unsafe fn slice_from_bytes_mut<U>(&mut self, o: *mut U, bytes: usize) -> &mut [U] {
+    pub unsafe fn slice_from_bytes_mut<U>(&mut self, ptr: *mut U, bytes: usize) -> &mut [U] {
         let count = bytes / size_of::<U>();
-        self.slice_from_count_mut(o, count)
+        self.slice_from_count_mut(ptr, count)
     }
     /// Given a pointer to a variable sized array field and the size of the entire struct in bytes
     /// including the size of the array, returns a slice to the entire variable sized array.
     /// # Safety
     /// The slice as specified by `o` and `total_bytes` must be entirely within the allocation
     /// contained by this box, and the data must be valid for the specified type.
-    pub unsafe fn slice_from_total_bytes<U>(&self, o: *const U, total_bytes: usize) -> &[U] {
-        let bytes = total_bytes - (o as usize - self.as_ptr() as usize);
-        self.slice_from_bytes(o, bytes)
+    pub unsafe fn slice_from_total_bytes<U>(&self, ptr: *const U, total_bytes: usize) -> &[U] {
+        let bytes = total_bytes - (ptr as usize - self.as_ptr() as usize);
+        self.slice_from_bytes(ptr, bytes)
     }
     /// Given a pointer to a variable sized array field and the size of the entire struct in bytes
     /// including the size of the array, returns a mutable slice to the entire variable sized
@@ -175,11 +177,11 @@ impl<T> VariableSizedBox<T> {
     /// contained by this box, and the data must be valid for the specified type.
     pub unsafe fn slice_from_total_bytes_mut<U>(
         &mut self,
-        o: *mut U,
+        ptr: *mut U,
         total_bytes: usize,
     ) -> &mut [U] {
-        let bytes = total_bytes - (o as usize - self.as_ptr() as usize);
-        self.slice_from_bytes_mut(o, bytes)
+        let bytes = total_bytes - (ptr as usize - self.as_ptr() as usize);
+        self.slice_from_bytes_mut(ptr, bytes)
     }
 }
 impl<T> Drop for VariableSizedBox<T> {
