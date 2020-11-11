@@ -47,7 +47,7 @@ winapi = { version = "0.3", features = [
 ] }
 
 [dev-dependencies]
-rand = "0.4"
+rand = "0.7"
 winapi = { version = "0.3", features = [
     "combaseapi",
     "consoleapi",
@@ -68,6 +68,7 @@ winapi = { version = "0.3", features = [
     "unknwnbase",
     "usbioctl",
     "usbiodef",
+    "utilapiset",
     "winbase",
     "wincon",
     "winerror",

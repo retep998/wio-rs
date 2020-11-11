@@ -4,7 +4,7 @@
 // All files in the project carrying such notice may not be copied, modified, or distributed
 // except according to those terms.
 use std::{
-    alloc::{alloc, alloc_zeroed, dealloc, handle_alloc_error, realloc, Layout},
+    alloc::{alloc_zeroed, dealloc, handle_alloc_error, realloc, Layout},
     marker::PhantomData,
     mem::{align_of, size_of},
     ptr::{self, NonNull},
@@ -19,24 +19,8 @@ pub struct VariableSizedBox<T> {
     pd: PhantomData<T>,
 }
 impl<T> VariableSizedBox<T> {
-    /// The size is specified in bytes. The data is uninitialized.
-    pub fn new(size: usize) -> VariableSizedBox<T> {
-        if size == 0 {
-            return VariableSizedBox::default();
-        }
-        let layout = Layout::from_size_align(size, align_of::<T>()).unwrap();
-        if let Some(data) = NonNull::new(unsafe { alloc(layout) }) {
-            VariableSizedBox {
-                size,
-                data: data.cast(),
-                pd: PhantomData,
-            }
-        } else {
-            handle_alloc_error(layout)
-        }
-    }
     /// The size is specified in bytes. The data is zeroed.
-    pub fn zeroed(size: usize) -> VariableSizedBox<T> {
+    pub fn new(size: usize) -> VariableSizedBox<T> {
         if size == 0 {
             return VariableSizedBox::default();
         }
@@ -82,20 +66,29 @@ impl<T> VariableSizedBox<T> {
         self.data.as_mut()
     }
     /// The size is specified in bytes.
-    /// If this grows the allocation, the extra bytes will be uninitialized.
-    /// I wish I could provide a zeroed alternative but Rust's stable allocators are lacking.
+    /// If this grows the allocation, the extra bytes will be zeroed.
     pub fn resize(&mut self, size: usize) {
-        if self.size == 0 || size == 0 {
+        if size == 0 || self.size == 0 {
             *self = VariableSizedBox::new(size);
-            return;
-        }
-        let layout = Layout::from_size_align(self.size, align_of::<T>()).unwrap();
-        if let Some(data) = NonNull::new(unsafe { realloc(self.as_mut_ptr().cast(), layout, size) })
-        {
-            self.data = data.cast();
-            self.size = size;
-        } else {
-            handle_alloc_error(layout)
+        } else if size > self.size {
+            let new = VariableSizedBox::<T>::new(size);
+            unsafe {
+                self.data
+                    .as_ptr()
+                    .cast::<u8>()
+                    .copy_to(new.data.as_ptr().cast(), self.size.min(size));
+            }
+            *self = new;
+        } else if size < self.size {
+            let layout = Layout::from_size_align(size, align_of::<T>()).unwrap();
+            if let Some(data) =
+                NonNull::new(unsafe { realloc(self.as_mut_ptr().cast(), layout, size) })
+            {
+                self.data = data.cast();
+                self.size = size;
+            } else {
+                handle_alloc_error(layout)
+            }
         }
     }
     /// The length of the allocation specified in bytes.
@@ -120,51 +113,114 @@ impl<T> VariableSizedBox<T> {
     }
     /// Given a pointer to a variable sized array field and the length of the array in elements,
     /// returns a slice to the entire variable sized array.
+    /// Will return `None` if the slice is not entirely within the allocation.
     /// # Safety
-    /// The slice as specified by `o` and `count` must be entirely within the allocation
-    /// contained by this box, and the data must be valid for the specified type.
+    /// The data must be valid for the specified type.
+    pub unsafe fn try_slice_from_count<U>(&self, ptr: *const U, count: usize) -> Option<&[U]> {
+        if ptr >= self.as_ptr().cast()
+            && count.checked_mul(size_of::<U>()).unwrap() <= self.size
+            && ptr.wrapping_add(count) >= ptr
+            && ptr.wrapping_add(count) <= self.as_ptr().cast::<u8>().add(self.size).cast()
+        {
+            Some(from_raw_parts(self.sanitize_ptr(ptr), count))
+        } else {
+            None
+        }
+    }
+    /// Given a pointer to a variable sized array field and the length of the array in elements,
+    /// returns a slice to the entire variable sized array.
+    /// Will panic if the slice is not entirely within the allocation.
+    /// # Safety
+    /// The data must be valid for the specified type.
     pub unsafe fn slice_from_count<U>(&self, ptr: *const U, count: usize) -> &[U] {
-        assert!(ptr >= self.as_ptr().cast());
-        assert!(count.checked_mul(size_of::<U>()).unwrap() <= self.size);
-        assert!(ptr.wrapping_add(count) >= ptr);
-        assert!(ptr.wrapping_add(count) <= self.as_ptr().cast::<u8>().add(self.size).cast());
-        from_raw_parts(self.sanitize_ptr(ptr), count)
+        self.try_slice_from_count(ptr, count).unwrap()
     }
     /// Given a pointer to a variable sized array field and the length of the array in elements,
     /// returns a mutable slice to the entire variable sized array.
+    /// Will return `None` if the slice is not entirely within the allocation.
     /// # Safety
-    /// The slice as specified by `o` and `count` must be entirely within the allocation
-    /// contained by this box, and the data must be valid for the specified type.
+    /// The data must be valid for the specified type.
+    pub unsafe fn try_slice_from_count_mut<U>(
+        &mut self,
+        ptr: *mut U,
+        count: usize,
+    ) -> Option<&mut [U]> {
+        if ptr >= self.as_mut_ptr().cast()
+            && count.checked_mul(size_of::<U>()).unwrap() <= self.size
+            && ptr.wrapping_add(count) >= ptr
+            && ptr.wrapping_add(count) <= self.as_mut_ptr().cast::<u8>().add(self.size).cast()
+        {
+            Some(from_raw_parts_mut(self.sanitize_mut_ptr(ptr), count))
+        } else {
+            None
+        }
+    }
+    /// Given a pointer to a variable sized array field and the length of the array in elements,
+    /// returns a mutable slice to the entire variable sized array.
+    /// Will panic if the slice is not entirely within the allocation.
+    /// # Safety
+    /// The data must be valid for the specified type.
     pub unsafe fn slice_from_count_mut<U>(&mut self, ptr: *mut U, count: usize) -> &mut [U] {
-        assert!(ptr >= self.as_mut_ptr().cast());
-        assert!(count.checked_mul(size_of::<U>()).unwrap() <= self.size);
-        assert!(ptr.wrapping_add(count) >= ptr);
-        assert!(ptr.wrapping_add(count) <= self.as_mut_ptr().cast::<u8>().add(self.size).cast());
-        from_raw_parts_mut(self.sanitize_mut_ptr(ptr), count)
+        self.try_slice_from_count_mut(ptr, count).unwrap()
     }
     /// Given a pointer to a variable sized array field and the length of the array in bytes,
     /// returns a slice to the entire variable sized array.
+    /// Will return `None` if the slice is not entirely within the allocation.
     /// # Safety
-    /// The slice as specified by `o` and `bytes` must be entirely within the allocation
-    /// contained by this box, and the data must be valid for the specified type.
+    /// The data must be valid for the specified type.
+    pub unsafe fn try_slice_from_bytes<U>(&self, ptr: *const U, bytes: usize) -> Option<&[U]> {
+        let count = bytes / size_of::<U>();
+        self.try_slice_from_count(ptr, count)
+    }
+    /// Given a pointer to a variable sized array field and the length of the array in bytes,
+    /// returns a slice to the entire variable sized array.
+    /// Will panic if the slice is not entirely within the allocation.
+    /// # Safety
+    /// The data must be valid for the specified type.
     pub unsafe fn slice_from_bytes<U>(&self, ptr: *const U, bytes: usize) -> &[U] {
         let count = bytes / size_of::<U>();
         self.slice_from_count(ptr, count)
     }
     /// Given a pointer to a variable sized array field and the length of the array in bytes,
     /// returns a mutable slice to the entire variable sized array.
+    /// Will return `None` if the slice is not entirely within the allocation.
     /// # Safety
-    /// The slice as specified by `o` and `bytes` must be entirely within the allocation
-    /// contained by this box, and the data must be valid for the specified type.
+    /// The data must be valid for the specified type.
+    pub unsafe fn try_slice_from_bytes_mut<U>(
+        &mut self,
+        ptr: *mut U,
+        bytes: usize,
+    ) -> Option<&mut [U]> {
+        let count = bytes / size_of::<U>();
+        self.try_slice_from_count_mut(ptr, count)
+    }
+    /// Given a pointer to a variable sized array field and the length of the array in bytes,
+    /// returns a mutable slice to the entire variable sized array.
+    /// Will panic if the slice is not entirely within the allocation.
+    /// # Safety
+    /// The data must be valid for the specified type.
     pub unsafe fn slice_from_bytes_mut<U>(&mut self, ptr: *mut U, bytes: usize) -> &mut [U] {
         let count = bytes / size_of::<U>();
         self.slice_from_count_mut(ptr, count)
     }
     /// Given a pointer to a variable sized array field and the size of the entire struct in bytes
     /// including the size of the array, returns a slice to the entire variable sized array.
+    /// Will return `None` if the slice is not entirely within the allocation.
     /// # Safety
-    /// The slice as specified by `o` and `total_bytes` must be entirely within the allocation
-    /// contained by this box, and the data must be valid for the specified type.
+    /// The data must be valid for the specified type.
+    pub unsafe fn try_slice_from_total_bytes<U>(
+        &self,
+        ptr: *const U,
+        total_bytes: usize,
+    ) -> Option<&[U]> {
+        let bytes = total_bytes - (ptr as usize - self.as_ptr() as usize);
+        self.try_slice_from_bytes(ptr, bytes)
+    }
+    /// Given a pointer to a variable sized array field and the size of the entire struct in bytes
+    /// including the size of the array, returns a slice to the entire variable sized array.
+    /// Will panic if the slice is not entirely within the allocation.
+    /// # Safety
+    /// The data must be valid for the specified type.
     pub unsafe fn slice_from_total_bytes<U>(&self, ptr: *const U, total_bytes: usize) -> &[U] {
         let bytes = total_bytes - (ptr as usize - self.as_ptr() as usize);
         self.slice_from_bytes(ptr, bytes)
@@ -172,9 +228,23 @@ impl<T> VariableSizedBox<T> {
     /// Given a pointer to a variable sized array field and the size of the entire struct in bytes
     /// including the size of the array, returns a mutable slice to the entire variable sized
     /// array.
+    /// Will return `None` if the slice is not entirely within the allocation.
     /// # Safety
-    /// The slice as specified by `o` and `total_bytes` must be entirely within the allocation
-    /// contained by this box, and the data must be valid for the specified type.
+    /// The data must be valid for the specified type.
+    pub unsafe fn try_slice_from_total_bytes_mut<U>(
+        &mut self,
+        ptr: *mut U,
+        total_bytes: usize,
+    ) -> Option<&mut [U]> {
+        let bytes = total_bytes - (ptr as usize - self.as_ptr() as usize);
+        self.try_slice_from_bytes_mut(ptr, bytes)
+    }
+    /// Given a pointer to a variable sized array field and the size of the entire struct in bytes
+    /// including the size of the array, returns a mutable slice to the entire variable sized
+    /// array.
+    /// Will panic if the slice is not entirely within the allocation.
+    /// # Safety
+    /// The data must be valid for the specified type.
     pub unsafe fn slice_from_total_bytes_mut<U>(
         &mut self,
         ptr: *mut U,
