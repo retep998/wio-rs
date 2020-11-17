@@ -138,6 +138,12 @@ impl ScreenBuffer {
         }
         Ok(())
     }
+    pub fn set_cursor_position(&self, pos: (i16, i16)) -> Result<()> {
+        let pos = w::COORD { X: pos.0, Y: pos.1 };
+        let res = unsafe { k32::SetConsoleCursorPosition(*self.0, pos) };
+        if res == 0 { return last_error() }
+        Ok(())
+    }
     pub fn font_size(&self) -> Result<(i16, i16)> {
         unsafe {
             let mut font = zeroed();
