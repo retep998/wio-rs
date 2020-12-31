@@ -7,6 +7,20 @@
 #![allow(clippy::missing_safety_doc, clippy::len_without_is_empty)]
 extern crate winapi;
 
+#[doc(hidden)]
+#[macro_export]
+#[cfg(feature = "log")]
+macro_rules! log_if_feature {
+    ($($args:tt)*) => {log::warn!($($args)*)};
+}
+
+#[doc(hidden)]
+#[macro_export]
+#[cfg(not(feature = "log"))]
+macro_rules! log_if_feature {
+    ($($args:tt)*) => {};
+}
+
 // pub mod apc;
 pub mod bstr;
 pub mod com;

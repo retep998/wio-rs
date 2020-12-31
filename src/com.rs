@@ -8,7 +8,63 @@ use std::mem::forget;
 use std::ops::Deref;
 use std::ptr::{null_mut, NonNull};
 use winapi::um::unknwnbase::IUnknown;
+use winapi::shared::guiddef::GUID;
+use winapi::shared::winerror::HRESULT;
 use winapi::Interface;
+
+/// Simplifies the common pattern of calling a function to initialize multiple `ComPtr`s.
+///
+/// This macro is a generalization of [`ComPtr::from_fn`][from_fn] to functions
+/// that output multiple COM objects. It returns `Result<($(ComPtr<_>,)+), HRESULT>`, where the
+/// `Ok` tuple contains the same number of `ComPtr` objects as the number of GUID/pointer pairs
+/// passed to this macro.
+///
+/// See [`ComPtr::from_fn`][from_fn] for details on the exact semantics.
+///
+/// [from_fn]: crate::com::ComPtr::from_fn
+#[macro_export]
+macro_rules! com_ptr_from_fn {
+    (
+        |$(($guid:pat, $ptr:ident)),+ $(,)?| $init:expr
+    ) => {{
+        use winapi::Interface;
+        use winapi::shared::guiddef::GUID;
+
+        // hack to get the GUID through type inference
+        struct GuidHack<T: Interface>(*mut T);
+        impl<T: Interface> GuidHack<T> {
+            fn guid(&self) -> GUID {
+                T::uuidof()
+            }
+        }
+
+        $(
+            let mut $ptr = GuidHack(std::ptr::null_mut());
+        )+
+
+        let result: winapi::shared::winerror::HRESULT = {
+            $(
+                let $guid = &$ptr.guid();
+                let $ptr = &mut *(&mut ($ptr.0) as *mut *mut _ as *mut *mut _);
+            )+
+            (|| $init)()
+        };
+        $(
+            let $ptr = $crate::com::ComPtr::new($ptr.0);
+        )+
+        match result {
+            0 => Ok(($(
+                $ptr.expect(concat!("`", stringify!($expr), "` must set `", stringify!($ptr), "` to a value")),
+            )+)),
+            res => {
+                $(if $ptr.is_some() {
+                    $crate::log_if_feature!("ComPtr::from_fn had an initialized COM pointer despite the function returning an error");
+                })+
+                Err(res)
+            }
+        }
+    }};
+}
 
 // ComPtr to wrap COM interfaces sanely
 #[repr(transparent)]
@@ -33,28 +89,27 @@ impl<T> ComPtr<T> {
     {
         ComPtr(NonNull::new(ptr).expect("ptr should not be null"))
     }
-    /// Simplifies the common pattern of calling a function to initialize a ComPtr.
+    /// Simplifies the common pattern of calling a function to initialize a `ComPtr`.
+    ///
+    /// `fun` gets passed `T`'s `GUID` and a mutable reference to a null pointer. If `fun` returns
+    /// `S_OK`, it _must_ initialize the pointer to a non-null value.
+    ///
+    /// If `fun` *doesn't* return `S_OK` but still initializes the pointer, this function will
+    /// assume that the pointer was initialized to a valid COM object and will call `Release` on
+    /// it. If the `log` feature is enabled, it will emit a warning when that happens.
+    ///
     /// May leak the COM pointer if the function panics after initializing the pointer.
-    /// The pointer provided to the function starts as a null pointer.
-    /// If the pointer is initialized to a non-null value, it will be interpreted as a valid COM
-    /// pointer, even if the function returns an error in which case it will be released by
-    /// `from_fn` and a warning logged if logging is enabled.
-    pub unsafe fn from_fn<F, E>(fun: F) -> Result<Option<ComPtr<T>>, E>
+    ///
+    /// If you're calling a COM function that generates multiple COM objects, use the
+    /// [`com_ptr_from_fn!`](../macro.com_ptr_from_fn.html) macro.
+    pub unsafe fn from_fn<F, P>(fun: F) -> Result<ComPtr<T>, HRESULT>
     where
         T: Interface,
-        F: FnOnce(&mut *mut T) -> Result<(), E>,
+        F: FnOnce(&GUID, &mut *mut P) -> HRESULT
     {
-        let mut ptr = null_mut();
-        let res = fun(&mut ptr);
-        let com = ComPtr::new(ptr);
-        match res {
-            Ok(()) => Ok(com),
-            Err(err) => {
-                if com.is_some() {
-                    #[cfg(feature = "log")] log::warn!("ComPtr::from_fn had an initialized COM pointer despite the function returning an error")
-                }
-                Err(err)
-            }
+        match com_ptr_from_fn!(|(guid, ptr)| fun(guid, ptr)) {
+            Ok((p,)) => Ok(p),
+            Err(e) => Err(e),
         }
     }
     /// Casts up the inheritance chain
