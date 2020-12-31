@@ -12,20 +12,6 @@ use winapi::shared::guiddef::GUID;
 use winapi::shared::winerror::HRESULT;
 use winapi::Interface;
 
-#[doc(hidden)]
-#[macro_export]
-#[cfg(feature = "log")]
-macro_rules! log_if_feature {
-    ($($args:tt)*) => {log::warn!($($args)*)};
-}
-
-#[doc(hidden)]
-#[macro_export]
-#[cfg(not(feature = "log"))]
-macro_rules! log_if_feature {
-    ($($args:tt)*) => {};
-}
-
 /// Simplifies the common pattern of calling a function to initialize multiple `ComPtr`s.
 ///
 /// This macro is a generalization of [`ComPtr::from_fn`][from_fn] to functions
