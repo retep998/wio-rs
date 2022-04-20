@@ -47,7 +47,7 @@ winapi = { version = "0.3", features = [
 ] }
 
 [dev-dependencies]
-rand = "0.7"
+rand = "0.8"
 winapi = { version = "0.3", features = [
     "combaseapi",
     "consoleapi",
