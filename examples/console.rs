@@ -1,9 +1,18 @@
 // Copyright © 2016, Peter Atashian
 // Licensed under the MIT License <LICENSE.md>
+#[cfg(not(windows))]
+fn main() {
+}
+
 extern crate rand;
 extern crate wio;
+
+#[cfg(windows)]
 use std::mem::swap;
+#[cfg(windows)]
 use wio::console::{CharInfo, Input, InputBuffer, ScreenBuffer};
+
+#[cfg(windows)]
 fn main() {
     let stdin = InputBuffer::from_conin().unwrap();
     let mut backbuf = ScreenBuffer::new().unwrap();
